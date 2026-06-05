@@ -161,6 +161,21 @@ function handleCustomerSearchFilter() {
     renderCustomerManagement();
 }
 
+// Customer Profile Merging Core Logic
+function populateMergeDropdowns() {
+    let srcSelect = document.getElementById('merge-source-select');
+    let tgtSelect = document.getElementById('merge-target-select');
+    
+    srcSelect.innerHTML = '<option value="">-- Select Duplicate Profile (To Merge From) --</option>';
+    tgtSelect.innerHTML = '<option value="">-- Select Target Primary Master Profile --</option>';
+    
+    let sortedCustomers = [...knownCustomers].sort();
+    sortedCustomers.forEach(cust => {
+        srcSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+        tgtSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+    });
+}
+
 function renderCustomerManagement() {
     const listDiv = document.getElementById('customer-management-list');
     listDiv.innerHTML = '';
@@ -197,21 +212,6 @@ function renderCustomerManagement() {
     listDiv.innerHTML = table;
 }
 
-// Customer Profile Merging Core Logic
-function populateMergeDropdowns() {
-    let srcSelect = document.getElementById('merge-source-select');
-    let tgtSelect = document.getElementById('merge-target-select');
-    
-    srcSelect.innerHTML = '<option value="">-- Select Duplicate Profile (To Merge From) --</option>';
-    tgtSelect.innerHTML = '<option value="">-- Select Target Primary Master Profile --</option>';
-    
-    let sortedCustomers = [...knownCustomers].sort();
-    sortedCustomers.forEach(cust => {
-        srcSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
-        tgtSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
-    });
-}
-
 function executeCustomerMerge() {
     let source = document.getElementById('merge-source-select').value;
     let target = document.getElementById('merge-target-select').value;
@@ -229,19 +229,16 @@ function executeCustomerMerge() {
         return;
     }
     
-    // 1. Rewrite current runtime active shift logs
     currentDayLog.forEach(log => {
         if(log.customer === source) log.customer = target;
     });
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
     
-    // 2. Rewrite current refund logs
     currentRefundLog.forEach(log => {
         if(log.customer === source) log.customer = target;
     });
     localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
     
-    // 3. Rewrite chronological history data cards
     allTimeHistory.forEach(day => {
         if (day.detailedTimeline) {
             day.detailedTimeline.forEach(entry => {
@@ -251,7 +248,6 @@ function executeCustomerMerge() {
     });
     localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
     
-    // 4. Remove old duplicate source reference from array
     let srcIdx = knownCustomers.indexOf(source);
     if(srcIdx > -1) knownCustomers.splice(srcIdx, 1);
     localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
@@ -264,15 +260,16 @@ function executeCustomerMerge() {
     renderLogs();
 }
 
-// System Backup and Data Restoration System
+// System Backup and Data Restoration System (Updated to safely grab live data)
 function exportSystemBackupJSON() {
+    // Dynamically pulls the absolute newest records active inside localStorage
     let backupPayload = {
-        categorizedMenu: customItems,
-        currentDayLog: currentDayLog,
-        currentRefundLog: currentRefundLog,
-        allTimeHistory: allTimeHistory,
-        knownCustomers: knownCustomers,
-        shiftStartTime: shiftStartTime
+        categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
+        currentDayLog: JSON.parse(localStorage.getItem('currentDayLog')) || currentDayLog,
+        currentRefundLog: JSON.parse(localStorage.getItem('currentRefundLog')) || currentRefundLog,
+        allTimeHistory: JSON.parse(localStorage.getItem('allTimeHistory')) || allTimeHistory,
+        knownCustomers: JSON.parse(localStorage.getItem('knownCustomers')) || knownCustomers,
+        shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime
     };
     
     let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
@@ -301,7 +298,6 @@ function importSystemBackupJSON() {
         try {
             let parsedData = JSON.parse(event.target.result);
             
-            // Comprehensive integrity checks to ensure no wrong inputs are imported
             if(!parsedData.categorizedMenu || !parsedData.knownCustomers || !parsedData.allTimeHistory) {
                 throw new Error("Invalid schema tracking configuration variables.");
             }
@@ -317,7 +313,6 @@ function importSystemBackupJSON() {
                 localStorage.removeItem('shiftStartTime');
             }
             
-            // Reload global variables state
             customItems = parsedData.categorizedMenu;
             currentDayLog = parsedData.currentDayLog || [];
             currentRefundLog = parsedData.currentRefundLog || [];
@@ -326,7 +321,7 @@ function importSystemBackupJSON() {
             shiftStartTime = parsedData.shiftStartTime || null;
             
             alert("Database Memory Override Successfully Restored!");
-            location.reload(); // Refresh viewport layout to display imported state variables
+            location.reload(); 
             
         } catch(err) {
             alert("Error parsing memory file: Invalid or corrupted JSON backup package schema layout.\n" + err.message);
@@ -477,13 +472,11 @@ function renderCategoryFilters() {
     });
 }
 
-// Workspace Category & Weight Helpers
 function getItemCategory(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found ? found.category : "Others";
 }
 
-// Get dynamic unit scaling weight factor
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
@@ -548,7 +541,6 @@ function changeQty(item, amount) {
     renderCart();
 }
 
-// Live Analytical Statistics Widget Update Engine
 function updateLiveBreakdown() {
     const container = document.getElementById('live-total-container');
     if (currentDayLog.length === 0 && currentRefundLog.length === 0) {
@@ -599,7 +591,6 @@ function updateLiveBreakdown() {
     container.innerHTML = html;
 }
 
-// Master Ledger Interface Render & Row Constructors
 function renderLogs() {
     const logBody = document.getElementById('live-log');
     logBody.innerHTML = '';
@@ -686,7 +677,6 @@ function renderLogs() {
     });
 }
 
-// Void Execution Intercept Handlers
 function refundLogItem(index) {
     if (!confirm("Execute target data structure mutation termination override script?")) return;
     openPinModal("Verification authorization protocols requested.", "refund", function() {
@@ -725,7 +715,6 @@ function printSingleRefundToken(refundObj) {
     setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
 }
 
-// Thermal Printer Output Formatter Generators
 function printSummaryReport(index) {
     const day = allTimeHistory[index];
     const printArea = document.getElementById('print-area');
@@ -833,9 +822,7 @@ function clearAllHistory() {
     });
 }
 
-// Operational Lifecycle Segment Closures (Open & End Shift Engine Routing)
 function attemptStartNewDay() {
-    // Correctly routes validation through the modal using the master variable '787898'
     openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
         startNewDay();
         alert("New operational tracking register open.");
@@ -868,7 +855,6 @@ function endDay() {
         
         let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
-        
         let shiftClosingTimestamp = getFormattedSystemDate();
         
         let dayRecord = { 
@@ -892,7 +878,6 @@ function endDay() {
     });
 }
 
-// Consumption Engine Matrix Ledger calculations
 function getAllConsumptionData() {
     let rows = [];
     let liveLabel = getFormattedSystemDate();
@@ -1039,7 +1024,6 @@ function renderConsumptionReport() {
         let displayQty = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let displayWeight = r.type === 'REFUND' ? `-${calcWeightKg}` : calcWeightKg;
-        
         let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}`;
 
         let tr = `<tr>
@@ -1052,6 +1036,11 @@ function renderConsumptionReport() {
         </tr>`;
         tbody.insertAdjacentHTML('beforeend', tr);
     });
+}
+
+function handleCustomerSearchFilter() {
+    activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
+    renderCustomerManagement();
 }
 
 function clearConsumptionFilters() {
