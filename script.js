@@ -20,22 +20,11 @@ let currentRefundLog = JSON.parse(localStorage.getItem('currentRefundLog')) || [
 let allTimeHistory = JSON.parse(localStorage.getItem('allTimeHistory')) || [];
 let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
-
-// Persistent Global Token Sequence Tracker Engine
-let nextTokenSequence = parseInt(localStorage.getItem('nextTokenSequence')) || 1;
+let nextTokenNumber = parseInt(localStorage.getItem('nextTokenNumber')) || 1001;
 
 let activeCallback = null;
 let requiredPinType = 'refund'; 
 let activeCustomerSearchQuery = "";
-
-// Sequential Token Number String Formatter Utility
-function generateRollingTokenNumber() {
-    let tokenStr = String(nextTokenSequence).padStart(4, '0');
-    nextTokenSequence++;
-    if (nextTokenSequence > 9999) nextTokenSequence = 1; // Rolling loop parameter boundaries
-    localStorage.setItem('nextTokenSequence', nextTokenSequence);
-    return tokenStr;
-}
 
 // Date String Sanitizer & Normalizer Engine
 function normalizeToSystemDate(rawDateString) {
@@ -115,8 +104,7 @@ function switchView(tabId) {
     document.querySelectorAll('.tab-content').forEach(element => element.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     document.querySelectorAll('.tab-btn').forEach(element => element.classList.remove('active'));
-    let targetTabButton = document.getElementById('btn-' + tabId);
-    if(targetTabButton) targetTabButton.classList.add('active');
+    document.getElementById('btn-' + tabId).classList.add('active');
     if (tabId === 'history-tab' || tabId === 'logs-tab') {
         renderLogs();
     }
@@ -159,61 +147,6 @@ function attemptOpenCustomers() {
     });
 }
 
-// POS INTEGRATED HANDSHAKE RETURN DESK LOGIC CORE
-function initiateTokenVoidSequence() {
-    let rawTokenNum = prompt("Please provide Target Token Identification Code (4-Digits):");
-    if (!rawTokenNum) return;
-    
-    let lookupTarget = rawTokenNum.trim().padStart(4, '0');
-    
-    // Scan matching index instances inside Live Register Segment Memory Array
-    let matchIdx = currentDayLog.findIndex(log => log.tokenNumber === lookupTarget);
-    
-    if (matchIdx === -1) {
-        alert(`Token #${lookupTarget} not active within current runtime shift matrix block record traces.`);
-        return;
-    }
-
-    let targetRecord = currentDayLog[matchIdx];
-
-    // Authorize security layer credentials
-    openPinModal(`Authorize Void Validation Code for Token #${lookupTarget}`, "refund", function() {
-        // Confirm visually directly inside browser overlay UI framework
-        let userConfirmation = confirm(
-            `CONFIRMATION MANIFEST DISPATCH SYSTEM:\n\n` +
-            `• Token Number: ${targetRecord.tokenNumber}\n` +
-            `• Menu Item: ${targetRecord.item}\n` +
-            `• Quantity Segment: x${targetRecord.qty}\n` +
-            `• Profile Account Name: ${targetRecord.customer || 'Walk-In'}\n\n` +
-            `Commit this tracking slice to Terminated Void Structures?`
-        );
-
-        if (!userConfirmation) return;
-
-        let now = new Date();
-        let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-        // Construct Void Trace Log Object Node
-        let refundObject = {
-            time: refundTime,
-            tokenNumber: targetRecord.tokenNumber,
-            item: targetRecord.item,
-            qty: targetRecord.qty,
-            customer: targetRecord.customer || "Walk-In"
-        };
-
-        // Transfer records across active database states
-        currentRefundLog.push(refundObject);
-        localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
-
-        currentDayLog.splice(matchIdx, 1);
-        localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-
-        alert(`Token #${lookupTarget} Void Execution integration sequence completed. No paper printed.`);
-        renderLogs();
-    });
-}
-
 function attemptOpenConsumption() {
     openPinModal("Enter Management Keys to Unlock Analytic Engine", "admin", function() {
         switchView('consumption-tab');
@@ -223,11 +156,13 @@ function attemptOpenConsumption() {
     });
 }
 
+// Identity Registry Profile Controls & Dynamic Search
 function handleCustomerSearchFilter() {
     activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
     renderCustomerManagement();
 }
 
+// Customer Profile Merging Core Logic
 function populateMergeDropdowns() {
     let srcSelect = document.getElementById('merge-source-select');
     let tgtSelect = document.getElementById('merge-target-select');
@@ -326,6 +261,7 @@ function executeCustomerMerge() {
     renderLogs();
 }
 
+// System Backup and Data Restoration System
 function exportSystemBackupJSON() {
     let backupPayload = {
         categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
@@ -334,7 +270,7 @@ function exportSystemBackupJSON() {
         allTimeHistory: JSON.parse(localStorage.getItem('allTimeHistory')) || allTimeHistory,
         knownCustomers: JSON.parse(localStorage.getItem('knownCustomers')) || knownCustomers,
         shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime,
-        nextTokenSequence: nextTokenSequence
+        nextTokenNumber: nextTokenNumber
     };
     
     let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
@@ -372,14 +308,14 @@ function importSystemBackupJSON() {
             localStorage.setItem('currentRefundLog', JSON.stringify(parsedData.currentRefundLog || []));
             localStorage.setItem('allTimeHistory', JSON.stringify(parsedData.allTimeHistory || []));
             localStorage.setItem('knownCustomers', JSON.stringify(parsedData.knownCustomers || []));
+            
+            nextTokenNumber = parsedData.nextTokenNumber || 1001;
+            localStorage.setItem('nextTokenNumber', nextTokenNumber);
+
             if(parsedData.shiftStartTime) {
                 localStorage.setItem('shiftStartTime', parsedData.shiftStartTime);
             } else {
                 localStorage.removeItem('shiftStartTime');
-            }
-            if(parsedData.nextTokenSequence) {
-                localStorage.setItem('nextTokenSequence', parsedData.nextTokenSequence);
-                nextTokenSequence = parsedData.nextTokenSequence;
             }
             
             customItems = parsedData.categorizedMenu;
@@ -393,7 +329,7 @@ function importSystemBackupJSON() {
             location.reload(); 
             
         } catch(err) {
-            alert("Error parsing memory file: Invalid JSON backup package schema configuration layout.\n" + err.message);
+            alert("Error parsing memory file: Invalid or corrupted JSON backup package schema layout.\n" + err.message);
         }
     };
     reader.readAsText(selectedFile);
@@ -402,7 +338,7 @@ function importSystemBackupJSON() {
 function renderMenuWeightsManagement() {
     const container = document.getElementById('menu-weights-management-container');
     container.innerHTML = '';
-    let table = `<div class="section-title" style="margin-top:16px; font-weight:800; font-size:12px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Active Dynamic Mass Multiplier Factors</div>
+    let table = `<div class="section-title" style="margin-top:16px;">Active Dynamic Mass Multiplier Factors</div>
     <table class="styled-table">
         <thead>
             <tr>
@@ -443,6 +379,7 @@ function updateItemWeightRow(index) {
     updateLiveBreakdown();
 }
 
+// Customers Layer Manual Actions
 function addCustomerManually() {
     let input = document.getElementById('new-manual-customer');
     let name = input.value.trim().replace(/\b\w/g, char => char.toUpperCase());
@@ -501,6 +438,65 @@ function openCustomerModal() {
     document.getElementById('cust-modal-name-input').focus();
 }
 
+// Counter POS Void Management System
+function triggerCounterPOSRefundFlow() {
+    let tokenInput = prompt("Enter Active Shift Token Number to Void:");
+    if (!tokenInput) return;
+    
+    let targetTokenNum = parseInt(tokenInput.trim().replace('#', ''));
+    if (isNaN(targetTokenNum)) {
+        alert("Invalid format token value.");
+        return;
+    }
+
+    // Dynamic linear trace match loop through active day buffer state
+    let targetLogIndex = currentDayLog.findIndex(log => log.tokenNumber === targetTokenNum);
+    
+    if (targetLogIndex === -1) {
+        alert(`Token #${targetTokenNum} not found in active running shift registry system.`);
+        return;
+    }
+
+    let matchedItemLog = currentDayLog[targetLogIndex];
+
+    // High fidelity on-screen structured design validation interface modal confirmation execution layout
+    let confirmed = confirm(
+        `===================================\n` +
+        `       SECURITY VOID DESK CHECK     \n` +
+        `===================================\n\n` +
+        ` TARGET TOKEN  : #${matchedItemLog.tokenNumber}\n` +
+        ` CUSTOMER NAME : ${matchedItemLog.customer || 'Walk-In'}\n` +
+        ` ORDER TIME    : ${matchedItemLog.time}\n` +
+        ` ITEM RECORD   : ${matchedItemLog.item} (x${matchedItemLog.qty})\n\n` +
+        `===================================\n` +
+        `Are you sure you want to completely void this token item from records?`
+    );
+
+    if (!confirmed) return;
+
+    openPinModal("Verification authorization protocols requested.", "refund", function() {
+        let now = new Date();
+        let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        let refundObject = { 
+            tokenNumber: matchedItemLog.tokenNumber,
+            time: refundTime, 
+            item: matchedItemLog.item, 
+            qty: matchedItemLog.qty, 
+            customer: matchedItemLog.customer || "Walk-In" 
+        };
+        
+        currentRefundLog.push(refundObject);
+        localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
+        
+        currentDayLog.splice(targetLogIndex, 1);
+        localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+        
+        alert(`Success: Token #${targetTokenNum} has been completely voided from data stream.`);
+        renderLogs();
+    });
+}
+
 function closeCustomerModal() { document.getElementById('customer-name-modal').style.display = 'none'; }
 
 function submitCustomerModal() {
@@ -523,6 +519,7 @@ function submitCustomerModal() {
     executeTokenPrinting(finalName); 
 }
 
+// POS Dynamic Grid Generators & Component Actions Layer
 function renderCategoryFilters() {
     const container = document.getElementById('category-filter-container');
     container.innerHTML = '';
@@ -545,7 +542,26 @@ function getItemCategory(itemName) {
     return found ? found.category : "Others";
 }
 
-// Fixed function to completely bypass structural system errors
+// Inject Counter POS Refund Action Interface Node layout underneath runtime cart viewport
+function updateCartUIPanelControls() {
+    let cartContainer = document.getElementById('cart-container');
+    if (!cartContainer) return;
+    
+    let existingControls = document.getElementById('pos-action-control-panel-wrapper');
+    if (existingControls) existingControls.remove();
+
+    let wrapper = document.createElement('div');
+    wrapper.id = 'pos-action-control-panel-wrapper';
+    wrapper.style = 'margin-top: 12px; display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--border); padding-top: 12px;';
+    
+    wrapper.innerHTML = `
+        <button class="print-report-btn" style="background-color: var(--danger) !important; color: white !important; font-weight: 700; width: 100%; border-radius: 6px; padding: 10px;" onclick="triggerCounterPOSRefundFlow()">
+            ⚠️ Void Token Registry
+        </button>
+    `;
+    cartContainer.after(wrapper);
+}
+
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
@@ -585,6 +601,7 @@ function renderCart() {
     container.innerHTML = '';
     if (Object.keys(currentCart).length === 0) {
         container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding-top:45px; margin:0; font-size: 13px;">Queue Array Buffer Allocation Empty</p>';
+        updateCartUIPanelControls();
         return;
     }
     for (let item in currentCart) {
@@ -600,6 +617,7 @@ function renderCart() {
         `;
         container.appendChild(div);
     }
+    updateCartUIPanelControls();
 }
 
 function addToCart(item) { currentCart[item] = (currentCart[item] || 0) + 1; renderCart(); }
@@ -660,38 +678,40 @@ function updateLiveBreakdown() {
     container.innerHTML = html;
 }
 
-// RENDER STREAM LOGS SHIFT VIEWS (Now featuring token validation keys)
 function renderLogs() {
     const logBody = document.getElementById('live-log');
     logBody.innerHTML = '';
-    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No active sale signals traced.</td></tr>`; }
+    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No item array stream signals captured.</td></tr>`; }
     
     for(let i = currentDayLog.length - 1; i >= 0; i--) {
         let log = currentDayLog[i];
-        let displayToken = log.tokenNumber || "N/A";
+        let tokenDisplay = `<span style="background:var(--primary-light); color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:800; font-size:12px; margin-right:6px;">#${log.tokenNumber}</span>`;
+        let customerDisplay = log.customer ? `<div style="font-size:11px; color:var(--primary); font-weight:700;">Profile Account: ${log.customer}</div>` : '';
+        let itemWeightKg = ((log.qty * getItemWeight(log.item)) / 1000).toFixed(2);
+        
         let row = `<tr>
             <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
-            <td style="font-family:monospace; font-weight:700; color:var(--accent);">#${displayToken}</td>
-            <td style="font-weight:700; color:var(--primary);">${log.customer || 'Walk-In'}</td>
-            <td style="font-weight:600; color:var(--text-main);">${log.item}</td>
-            <td style="text-align:right; font-weight:700; color:var(--primary);">x${log.qty}</td>
+            <td><div style="font-weight:600; color:var(--text-main); display:flex; align-items:center;">${tokenDisplay} ${log.item}</div>${customerDisplay}</td>
+            <td style="text-align:center; font-weight:700; color:var(--primary);">x${log.qty}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${itemWeightKg} KG</span></td>
+            <td style="text-align:center; font-size:11px; color:var(--text-muted); font-style:italic;">Active Shift Line</td>
         </tr>`;
         logBody.insertAdjacentHTML('beforeend', row);
     }
 
     const refundBody = document.getElementById('refund-log');
     refundBody.innerHTML = '';
-    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No void history signals traced.</td></tr>`; }
+    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generated.</td></tr>`; }
     
     for(let j = currentRefundLog.length - 1; j >= 0; j--) {
         let rLog = currentRefundLog[j];
-        let displayToken = rLog.tokenNumber || "N/A";
+        let tokenDisplay = `<span style="background:#fee2e2; color:var(--danger); padding:2px 6px; border-radius:4px; font-weight:800; font-size:11px; margin-right:4px;">#${rLog.tokenNumber || 'N/A'}</span>`;
+        let customerDisplay = rLog.customer ? `<div style="font-size:10px; color:var(--danger); font-weight:600;">Customer Trace: ${rLog.customer}</div>` : '';
+        let itemWeightKg = ((rLog.qty * getItemWeight(rLog.item)) / 1000).toFixed(2);
+        
         let row = `<tr>
             <td style="color:var(--danger); font-weight:500;">${rLog.time}</td>
-            <td style="font-family:monospace; font-weight:700; color:var(--text-muted);">#${displayToken}</td>
-            <td style="color:var(--text-muted); text-decoration: line-through;">${rLog.customer || 'Walk-In'}</td>
-            <td style="font-weight:600; color:var(--text-muted); text-decoration: line-through;">${rLog.item}</td>
-            <td style="text-align:right; font-weight:700; color:var(--danger); text-decoration: line-through;">x${rLog.qty}</td>
+            <td><div style="font-weight:600; color:var(--text-muted); text-decoration: line-through; display:flex; align-items:center;">${tokenDisplay} ${rLog.item}</div>${customerDisplay}</td>
+            <td style="text-align:center; font-weight:700; color:var(--danger);">x${rLog.qty}<br><span style="font-size:10px; font-weight:normal;">-${itemWeightKg} KG</span></td>
         </tr>`;
         refundBody.insertAdjacentHTML('beforeend', row);
     }
@@ -700,7 +720,7 @@ function renderLogs() {
 
     const histContainer = document.getElementById('history-container');
     histContainer.innerHTML = '';
-    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger archive is empty.</p>'; }
+    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger history index empty array structure.</p>'; }
     
     allTimeHistory.forEach((day, index) => {
         let normalizedDateLabel = normalizeToSystemDate(day.date);
@@ -739,8 +759,9 @@ function renderLogs() {
             day.detailedTimeline.forEach(t => {
                 let styleRule = t.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-main);';
                 let nameSuffix = t.customer ? ` (${t.customer})` : '';
-                let tNumDisplay = t.tokenNumber ? ` [#${t.tokenNumber}]` : '';
-                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}]${tNumDisplay} ${t.type}: ${t.item}${nameSuffix} x${t.qty}</div>`;
+                let tNumPrefix = t.tokenNumber ? `[#${t.tokenNumber}] ` : '';
+                let wCalc = ((t.qty * getItemWeight(t.item)) / 1000).toFixed(2);
+                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}] ${t.type}: ${tNumPrefix}${t.item}${nameSuffix} x${t.qty} (${wCalc} KG)</div>`;
             });
             html += `</div>`;
         }
@@ -802,7 +823,7 @@ function printTokens() {
     openCustomerModal();
 }
 
-// PRINTING TOKENS WITH UNIQUE INJECTED SERIAL CODE (Weight string display fully stripped)
+// Token Printing Generation Protocol Loop Engine 
 function executeTokenPrinting(customerName) {
     const printArea = document.getElementById('print-area');
     printArea.innerHTML = ''; 
@@ -817,23 +838,22 @@ function executeTokenPrinting(customerName) {
 
     for (let item in currentCart) {
         let qty = currentCart[item];
-        let tokenNum = generateRollingTokenNumber(); // Dynamic numerical tracking anchor
-
-        // Commit tracking record instance directly to log matrix arrays
+        let assignedToken = nextTokenNumber++; // Fetch and advance sequential counter ID
+        
         currentDayLog.push({ 
+            tokenNumber: assignedToken,
             time: timeStr, 
-            tokenNumber: tokenNum, 
             item: item, 
             qty: qty, 
             customer: customerName 
         });
-
+        
         let token = document.createElement('div');
         token.className = 'pos-token';
         
         token.innerHTML = `
             <div class="brand-main">AHMED HANIF RAJPUT</div>
-            <div style="font-size: 15px; font-weight: 900; text-align: center; color: #ffffff !important; background-color: #000000 !important; padding: 3px 0; margin: 4px 0;">TOKEN ID: #${tokenNum}</div>
+            <div style="font-size: 26px; font-weight: 900; text-align: center; margin: 6px 0; border: 2px solid #000; padding: 4px 0;">TOKEN: #${assignedToken}</div>
             <div class="pos-divider"></div>
             <div class="item-container">
                 <div class="pos-item">${item}</div>
@@ -841,11 +861,14 @@ function executeTokenPrinting(customerName) {
             </div>
             <div class="pos-divider"></div>
             <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
-            <div style="font-size:12px; font-weight:900; margin-top:5px; text-transform:uppercase;">ACCOUNT: ${customerName}</div>
+            <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase;">ACCOUNT MAPPING: ${customerName}</div>
         `;
         printArea.appendChild(token);
     }
+    
+    localStorage.setItem('nextTokenNumber', nextTokenNumber);
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+    
     setTimeout(() => { window.print(); currentCart = {}; renderCart(); renderLogs(); }, 50);
 }
 
@@ -875,8 +898,9 @@ function attemptStartNewDay() {
 }
 
 function startNewDay() {
-    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
+    currentDayLog = []; currentRefundLog = []; shiftStartTime = null; nextTokenNumber = 1001;
     localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
+    localStorage.setItem('nextTokenNumber', nextTokenNumber);
     currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
 }
 
@@ -889,11 +913,11 @@ function endDay() {
         currentDayLog.forEach(log => { 
             netItems += log.qty; grossItemsCount += log.qty;
             summary[log.item] = (summary[log.item] || 0) + log.qty; 
-            detailedTimeline.push({time: log.time, tokenNumber: log.tokenNumber, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer});
+            detailedTimeline.push({tokenNumber: log.tokenNumber, time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer});
         });
         currentRefundLog.forEach(log => {
             grossItemsCount += log.qty;
-            detailedTimeline.push({time: log.time, tokenNumber: log.tokenNumber, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In"});
+            detailedTimeline.push({tokenNumber: log.tokenNumber, time: log.time, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In"});
         });
         
         detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
@@ -936,7 +960,7 @@ function getAllConsumptionData() {
         if (day.detailedTimeline) {
             day.detailedTimeline.forEach(t => {
                 let rangeStr = (day.startTime && day.endTime) ? ` [${day.startTime}-${day.endTime}]` : '';
-                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, tokenNumber: t.tokenNumber || "N/A", time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type });
+                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, tokenNumber: t.tokenNumber, time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type });
             });
         }
     });
@@ -1069,19 +1093,24 @@ function renderConsumptionReport() {
         let displayQty = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let displayWeight = r.type === 'REFUND' ? `-${calcWeightKg}` : calcWeightKg;
-        let tNumDisplay = r.tokenNumber ? ` [#${r.tokenNumber}]` : '';
-        let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}${tNumDisplay}`;
+        let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}`;
+        let tPrefix = r.tokenNumber ? `[#${r.tokenNumber}] ` : '';
 
         let tr = `<tr>
             <td style="font-weight: 500; color: var(--text-muted);">${dateTimeDisplay}</td>
             <td style="font-weight:600;">${r.customer}</td>
-            <td>${r.item}</td>
+            <td>${tPrefix}${r.item}</td>
             <td style="${qtyStyle}">${displayQty}</td>
             <td style="text-align:right; font-weight:600;">${displayWeight} KG</td>
             <td><span style="${statusStyle}">${r.type}</span></td>
         </tr>`;
         tbody.insertAdjacentHTML('beforeend', tr);
     });
+}
+
+function handleCustomerSearchFilter() {
+    activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
+    renderCustomerManagement();
 }
 
 function clearConsumptionFilters() {
@@ -1094,12 +1123,12 @@ function clearConsumptionFilters() {
 function exportConsumptionToCSV() {
     let data = getAllConsumptionData();
     if(data.length === 0) return alert("Structural target storage layer empty.");
-    let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Token Number,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
+    let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Token Reference,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
     data.forEach(r => {
         let val = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let wVal = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let wStr = r.type === 'REFUND' ? `-${wVal}` : wVal;
-        csvContent += `"${r.date}, ${r.time || 'N/A'}","${r.tokenNumber || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
+        csvContent += `"${r.date}, ${r.time || 'N/A'}","#${r.tokenNumber || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
     });
     let encodedUri = encodeURI(csvContent);
     let link = document.createElement("a");
