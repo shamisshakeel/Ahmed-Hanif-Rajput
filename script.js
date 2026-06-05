@@ -20,7 +20,6 @@ let currentRefundLog = JSON.parse(localStorage.getItem('currentRefundLog')) || [
 let allTimeHistory = JSON.parse(localStorage.getItem('allTimeHistory')) || [];
 let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
-let nextTokenNumber = parseInt(localStorage.getItem('nextTokenNumber')) || 1001;
 
 let activeCallback = null;
 let requiredPinType = 'refund'; 
@@ -51,7 +50,7 @@ function getFormattedSystemDate(dateObj = new Date()) {
     return `${day} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
 }
 
-// Levenshtein String Proximity Matcher
+// Levenshtein String Proximity Matcher (Automated Customer Identification Matching)
 function getLevenshteinDistance(a, b) {
     if (a.length === 0) return b.length;
     if (b.length === 0) return a.length;
@@ -269,8 +268,7 @@ function exportSystemBackupJSON() {
         currentRefundLog: JSON.parse(localStorage.getItem('currentRefundLog')) || currentRefundLog,
         allTimeHistory: JSON.parse(localStorage.getItem('allTimeHistory')) || allTimeHistory,
         knownCustomers: JSON.parse(localStorage.getItem('knownCustomers')) || knownCustomers,
-        shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime,
-        nextTokenNumber: nextTokenNumber
+        shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime
     };
     
     let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
@@ -308,10 +306,6 @@ function importSystemBackupJSON() {
             localStorage.setItem('currentRefundLog', JSON.stringify(parsedData.currentRefundLog || []));
             localStorage.setItem('allTimeHistory', JSON.stringify(parsedData.allTimeHistory || []));
             localStorage.setItem('knownCustomers', JSON.stringify(parsedData.knownCustomers || []));
-            
-            nextTokenNumber = parsedData.nextTokenNumber || 1001;
-            localStorage.setItem('nextTokenNumber', nextTokenNumber);
-
             if(parsedData.shiftStartTime) {
                 localStorage.setItem('shiftStartTime', parsedData.shiftStartTime);
             } else {
@@ -438,65 +432,6 @@ function openCustomerModal() {
     document.getElementById('cust-modal-name-input').focus();
 }
 
-// Counter POS Void Management System
-function triggerCounterPOSRefundFlow() {
-    let tokenInput = prompt("Enter Active Shift Token Number to Void:");
-    if (!tokenInput) return;
-    
-    let targetTokenNum = parseInt(tokenInput.trim().replace('#', ''));
-    if (isNaN(targetTokenNum)) {
-        alert("Invalid format token value.");
-        return;
-    }
-
-    // Dynamic linear trace match loop through active day buffer state
-    let targetLogIndex = currentDayLog.findIndex(log => log.tokenNumber === targetTokenNum);
-    
-    if (targetLogIndex === -1) {
-        alert(`Token #${targetTokenNum} not found in active running shift registry system.`);
-        return;
-    }
-
-    let matchedItemLog = currentDayLog[targetLogIndex];
-
-    // High fidelity on-screen structured design validation interface modal confirmation execution layout
-    let confirmed = confirm(
-        `===================================\n` +
-        `       SECURITY VOID DESK CHECK     \n` +
-        `===================================\n\n` +
-        ` TARGET TOKEN  : #${matchedItemLog.tokenNumber}\n` +
-        ` CUSTOMER NAME : ${matchedItemLog.customer || 'Walk-In'}\n` +
-        ` ORDER TIME    : ${matchedItemLog.time}\n` +
-        ` ITEM RECORD   : ${matchedItemLog.item} (x${matchedItemLog.qty})\n\n` +
-        `===================================\n` +
-        `Are you sure you want to completely void this token item from records?`
-    );
-
-    if (!confirmed) return;
-
-    openPinModal("Verification authorization protocols requested.", "refund", function() {
-        let now = new Date();
-        let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
-        let refundObject = { 
-            tokenNumber: matchedItemLog.tokenNumber,
-            time: refundTime, 
-            item: matchedItemLog.item, 
-            qty: matchedItemLog.qty, 
-            customer: matchedItemLog.customer || "Walk-In" 
-        };
-        
-        currentRefundLog.push(refundObject);
-        localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
-        
-        currentDayLog.splice(targetLogIndex, 1);
-        localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-        
-        alert(`Success: Token #${targetTokenNum} has been completely voided from data stream.`);
-        renderLogs();
-    });
-}
-
 function closeCustomerModal() { document.getElementById('customer-name-modal').style.display = 'none'; }
 
 function submitCustomerModal() {
@@ -542,26 +477,6 @@ function getItemCategory(itemName) {
     return found ? found.category : "Others";
 }
 
-// Inject Counter POS Refund Action Interface Node layout underneath runtime cart viewport
-function updateCartUIPanelControls() {
-    let cartContainer = document.getElementById('cart-container');
-    if (!cartContainer) return;
-    
-    let existingControls = document.getElementById('pos-action-control-panel-wrapper');
-    if (existingControls) existingControls.remove();
-
-    let wrapper = document.createElement('div');
-    wrapper.id = 'pos-action-control-panel-wrapper';
-    wrapper.style = 'margin-top: 12px; display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--border); padding-top: 12px;';
-    
-    wrapper.innerHTML = `
-        <button class="print-report-btn" style="background-color: var(--danger) !important; color: white !important; font-weight: 700; width: 100%; border-radius: 6px; padding: 10px;" onclick="triggerCounterPOSRefundFlow()">
-            ⚠️ Void Token Registry
-        </button>
-    `;
-    cartContainer.after(wrapper);
-}
-
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
@@ -601,7 +516,6 @@ function renderCart() {
     container.innerHTML = '';
     if (Object.keys(currentCart).length === 0) {
         container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding-top:45px; margin:0; font-size: 13px;">Queue Array Buffer Allocation Empty</p>';
-        updateCartUIPanelControls();
         return;
     }
     for (let item in currentCart) {
@@ -617,7 +531,6 @@ function renderCart() {
         `;
         container.appendChild(div);
     }
-    updateCartUIPanelControls();
 }
 
 function addToCart(item) { currentCart[item] = (currentCart[item] || 0) + 1; renderCart(); }
@@ -685,15 +598,13 @@ function renderLogs() {
     
     for(let i = currentDayLog.length - 1; i >= 0; i--) {
         let log = currentDayLog[i];
-        let tokenDisplay = `<span style="background:var(--primary-light); color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:800; font-size:12px; margin-right:6px;">#${log.tokenNumber}</span>`;
         let customerDisplay = log.customer ? `<div style="font-size:11px; color:var(--primary); font-weight:700;">Profile Account: ${log.customer}</div>` : '';
         let itemWeightKg = ((log.qty * getItemWeight(log.item)) / 1000).toFixed(2);
-        
         let row = `<tr>
             <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
-            <td><div style="font-weight:600; color:var(--text-main); display:flex; align-items:center;">${tokenDisplay} ${log.item}</div>${customerDisplay}</td>
+            <td><div style="font-weight:600; color:var(--text-main);">${log.item}</div>${customerDisplay}</td>
             <td style="text-align:center; font-weight:700; color:var(--primary);">x${log.qty}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${itemWeightKg} KG</span></td>
-            <td style="text-align:center; font-size:11px; color:var(--text-muted); font-style:italic;">Active Shift Line</td>
+            <td style="text-align:center;"><button class="btn-action-small btn-refund" onclick="refundLogItem(${i})">Void</button></td>
         </tr>`;
         logBody.insertAdjacentHTML('beforeend', row);
     }
@@ -704,13 +615,10 @@ function renderLogs() {
     
     for(let j = currentRefundLog.length - 1; j >= 0; j--) {
         let rLog = currentRefundLog[j];
-        let tokenDisplay = `<span style="background:#fee2e2; color:var(--danger); padding:2px 6px; border-radius:4px; font-weight:800; font-size:11px; margin-right:4px;">#${rLog.tokenNumber || 'N/A'}</span>`;
-        let customerDisplay = rLog.customer ? `<div style="font-size:10px; color:var(--danger); font-weight:600;">Customer Trace: ${rLog.customer}</div>` : '';
         let itemWeightKg = ((rLog.qty * getItemWeight(rLog.item)) / 1000).toFixed(2);
-        
         let row = `<tr>
             <td style="color:var(--danger); font-weight:500;">${rLog.time}</td>
-            <td><div style="font-weight:600; color:var(--text-muted); text-decoration: line-through; display:flex; align-items:center;">${tokenDisplay} ${rLog.item}</div>${customerDisplay}</td>
+            <td style="font-weight:600; color:var(--text-muted); text-decoration: line-through;">${rLog.item}</td>
             <td style="text-align:center; font-weight:700; color:var(--danger);">x${rLog.qty}<br><span style="font-size:10px; font-weight:normal;">-${itemWeightKg} KG</span></td>
         </tr>`;
         refundBody.insertAdjacentHTML('beforeend', row);
@@ -759,15 +667,52 @@ function renderLogs() {
             day.detailedTimeline.forEach(t => {
                 let styleRule = t.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-main);';
                 let nameSuffix = t.customer ? ` (${t.customer})` : '';
-                let tNumPrefix = t.tokenNumber ? `[#${t.tokenNumber}] ` : '';
                 let wCalc = ((t.qty * getItemWeight(t.item)) / 1000).toFixed(2);
-                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}] ${t.type}: ${tNumPrefix}${t.item}${nameSuffix} x${t.qty} (${wCalc} KG)</div>`;
+                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}] ${t.type}: ${t.item}${nameSuffix} x${t.qty} (${wCalc} KG)</div>`;
             });
             html += `</div>`;
         }
         html += `<button class="print-report-btn" onclick="printSummaryReport(${index})">Generate Thermal Report</button></div>`;
         histContainer.insertAdjacentHTML('afterbegin', html);
     });
+}
+
+function refundLogItem(index) {
+    if (!confirm("Execute target data structure mutation termination override script?")) return;
+    openPinModal("Verification authorization protocols requested.", "refund", function() {
+        let now = new Date();
+        let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        let targetItem = currentDayLog[index];
+        let refundObject = { time: refundTime, item: targetItem.item, qty: targetItem.qty, customer: targetItem.customer || "Walk-In" };
+        currentRefundLog.push(refundObject);
+        localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
+        currentDayLog.splice(index, 1);
+        localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+        renderLogs();
+        printSingleRefundToken(refundObject);
+    });
+}
+
+function printSingleRefundToken(refundObj) {
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+    let token = document.createElement('div');
+    token.className = 'pos-token';
+    let weightStr = ((refundObj.qty * getItemWeight(refundObj.item)) / 1000).toFixed(2);
+    token.innerHTML = `
+        <div class="brand-main">AHMED HANIF RAJPUT</div>
+        <div style="font-size: 14px; font-weight: 900; text-align: center; color: #ffffff !important; background-color: #000000 !important; padding: 2px 0; margin: 4px 0;">[ VOID CANCEL ]</div>
+        <div class="pos-divider"></div>
+        <div class="item-container">
+            <div class="pos-item" style="text-decoration: line-through;">${refundObj.item}</div>
+            <div class="pos-qty">TERMINATED: [ ${refundObj.qty} ]</div>
+            <div style="font-weight:900; font-size:14px; margin-top:4px;">-${weightStr} KG</div>
+        </div>
+        <div class="pos-divider"></div>
+        <div class="meta-line">DATE: ${getFormattedSystemDate()} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${refundObj.time}</div>
+    `;
+    printArea.appendChild(token);
+    setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
 }
 
 function printSummaryReport(index) {
@@ -823,7 +768,7 @@ function printTokens() {
     openCustomerModal();
 }
 
-// Token Printing Generation Protocol Loop Engine 
+// Token Printing Generator (Updated: Weight line removed from thermal string blueprint)
 function executeTokenPrinting(customerName) {
     const printArea = document.getElementById('print-area');
     printArea.innerHTML = ''; 
@@ -838,22 +783,13 @@ function executeTokenPrinting(customerName) {
 
     for (let item in currentCart) {
         let qty = currentCart[item];
-        let assignedToken = nextTokenNumber++; // Fetch and advance sequential counter ID
-        
-        currentDayLog.push({ 
-            tokenNumber: assignedToken,
-            time: timeStr, 
-            item: item, 
-            qty: qty, 
-            customer: customerName 
-        });
-        
+        currentDayLog.push({ time: timeStr, item: item, qty: qty, customer: customerName });
         let token = document.createElement('div');
         token.className = 'pos-token';
         
+        // Removed weight calculation innerHTML metrics element block from token template
         token.innerHTML = `
             <div class="brand-main">AHMED HANIF RAJPUT</div>
-            <div style="font-size: 26px; font-weight: 900; text-align: center; margin: 6px 0; border: 2px solid #000; padding: 4px 0;">TOKEN: #${assignedToken}</div>
             <div class="pos-divider"></div>
             <div class="item-container">
                 <div class="pos-item">${item}</div>
@@ -865,10 +801,7 @@ function executeTokenPrinting(customerName) {
         `;
         printArea.appendChild(token);
     }
-    
-    localStorage.setItem('nextTokenNumber', nextTokenNumber);
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-    
     setTimeout(() => { window.print(); currentCart = {}; renderCart(); renderLogs(); }, 50);
 }
 
@@ -898,9 +831,8 @@ function attemptStartNewDay() {
 }
 
 function startNewDay() {
-    currentDayLog = []; currentRefundLog = []; shiftStartTime = null; nextTokenNumber = 1001;
+    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
     localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-    localStorage.setItem('nextTokenNumber', nextTokenNumber);
     currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
 }
 
@@ -913,11 +845,11 @@ function endDay() {
         currentDayLog.forEach(log => { 
             netItems += log.qty; grossItemsCount += log.qty;
             summary[log.item] = (summary[log.item] || 0) + log.qty; 
-            detailedTimeline.push({tokenNumber: log.tokenNumber, time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer});
+            detailedTimeline.push({time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer});
         });
         currentRefundLog.forEach(log => {
             grossItemsCount += log.qty;
-            detailedTimeline.push({tokenNumber: log.tokenNumber, time: log.time, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In"});
+            detailedTimeline.push({time: log.time, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In"});
         });
         
         detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
@@ -951,16 +883,16 @@ function getAllConsumptionData() {
     let rows = [];
     let liveLabel = getFormattedSystemDate();
     currentDayLog.forEach(l => {
-        rows.push({ date: liveLabel, shiftId: "LIVE", tokenNumber: l.tokenNumber, time: l.time, customer: l.customer || "Walk-In", item: l.item, qty: l.qty, type: "SALE" });
+        rows.push({ date: liveLabel, shiftId: "LIVE", time: l.time, customer: l.customer || "Walk-In", item: l.item, qty: l.qty, type: "SALE" });
     });
     currentRefundLog.forEach(r => {
-        rows.push({ date: liveLabel, shiftId: "LIVE", tokenNumber: r.tokenNumber, time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: "REFUND" });
+        rows.push({ date: liveLabel, shiftId: "LIVE", time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: "REFUND" });
     });
     allTimeHistory.forEach((day, idx) => {
         if (day.detailedTimeline) {
             day.detailedTimeline.forEach(t => {
                 let rangeStr = (day.startTime && day.endTime) ? ` [${day.startTime}-${day.endTime}]` : '';
-                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, tokenNumber: t.tokenNumber, time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type });
+                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type });
             });
         }
     });
@@ -1094,12 +1026,11 @@ function renderConsumptionReport() {
         let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let displayWeight = r.type === 'REFUND' ? `-${calcWeightKg}` : calcWeightKg;
         let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}`;
-        let tPrefix = r.tokenNumber ? `[#${r.tokenNumber}] ` : '';
 
         let tr = `<tr>
             <td style="font-weight: 500; color: var(--text-muted);">${dateTimeDisplay}</td>
             <td style="font-weight:600;">${r.customer}</td>
-            <td>${tPrefix}${r.item}</td>
+            <td>${r.item}</td>
             <td style="${qtyStyle}">${displayQty}</td>
             <td style="text-align:right; font-weight:600;">${displayWeight} KG</td>
             <td><span style="${statusStyle}">${r.type}</span></td>
@@ -1113,6 +1044,7 @@ function handleCustomerSearchFilter() {
     renderCustomerManagement();
 }
 
+// Clear Filters Logic
 function clearConsumptionFilters() {
     document.getElementById('filter-cust').value = "ALL";
     document.getElementById('filter-item').value = "ALL";
@@ -1123,12 +1055,12 @@ function clearConsumptionFilters() {
 function exportConsumptionToCSV() {
     let data = getAllConsumptionData();
     if(data.length === 0) return alert("Structural target storage layer empty.");
-    let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Token Reference,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
+    let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
     data.forEach(r => {
         let val = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let wVal = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let wStr = r.type === 'REFUND' ? `-${wVal}` : wVal;
-        csvContent += `"${r.date}, ${r.time || 'N/A'}","#${r.tokenNumber || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
+        csvContent += `"${r.date}, ${r.time || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
     });
     let encodedUri = encodeURI(csvContent);
     let link = document.createElement("a");
