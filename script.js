@@ -260,9 +260,8 @@ function executeCustomerMerge() {
     renderLogs();
 }
 
-// System Backup and Data Restoration System (Updated to safely grab live data)
+// System Backup and Data Restoration System
 function exportSystemBackupJSON() {
-    // Dynamically pulls the absolute newest records active inside localStorage
     let backupPayload = {
         categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
         currentDayLog: JSON.parse(localStorage.getItem('currentDayLog')) || currentDayLog,
@@ -374,6 +373,7 @@ function updateItemWeightRow(index) {
     updateLiveBreakdown();
 }
 
+// Customers Layer Manual Actions
 function addCustomerManually() {
     let input = document.getElementById('new-manual-customer');
     let name = input.value.trim().replace(/\b\w/g, char => char.toUpperCase());
@@ -768,6 +768,7 @@ function printTokens() {
     openCustomerModal();
 }
 
+// Token Printing Generator (Updated: Weight line removed from thermal string blueprint)
 function executeTokenPrinting(customerName) {
     const printArea = document.getElementById('print-area');
     printArea.innerHTML = ''; 
@@ -785,14 +786,14 @@ function executeTokenPrinting(customerName) {
         currentDayLog.push({ time: timeStr, item: item, qty: qty, customer: customerName });
         let token = document.createElement('div');
         token.className = 'pos-token';
-        let calculatedW = ((qty * getItemWeight(item)) / 1000).toFixed(2);
+        
+        // Removed weight calculation innerHTML metrics element block from token template
         token.innerHTML = `
             <div class="brand-main">AHMED HANIF RAJPUT</div>
             <div class="pos-divider"></div>
             <div class="item-container">
                 <div class="pos-item">${item}</div>
                 <div class="pos-qty">UNITS COUNT: [ ${qty} ]</div>
-                <div style="font-size:14px; font-weight:900; margin-top:4px;">Dynamic Mass Total: ${calculatedW} KG</div>
             </div>
             <div class="pos-divider"></div>
             <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
@@ -1043,6 +1044,7 @@ function handleCustomerSearchFilter() {
     renderCustomerManagement();
 }
 
+// Clear Filters Logic
 function clearConsumptionFilters() {
     document.getElementById('filter-cust').value = "ALL";
     document.getElementById('filter-item').value = "ALL";
