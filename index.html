@@ -2,97 +2,351 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AHRP POS Engine v2</title>
-    </head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AHRP - Advanced Counter POS</title>
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --surface: #ffffff;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+        }
+
+        /* App Navbar Layout */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            color: white;
+            padding: 12px 24px;
+        }
+        .brand-title { font-weight: 800; font-size: 18px; letter-spacing: 0.5px; }
+        .nav-tabs { display: flex; gap: 8px; }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 8px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { background: #1e293b; color: white; }
+
+        /* Main View Workspace Container */
+        .workspace { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* POS Grid Sheet Interface */
+        .pos-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
+        .menu-side { display: flex; flex-direction: column; gap: 16px; }
+        
+        .category-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+        .category-filter-btn {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .category-filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .menu-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 12px;
+            text-align: center;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .menu-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        /* Checkout Side panel */
+        .checkout-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 120px);
+        }
+        .panel-header { font-weight: 700; font-size: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .cart-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        
+        .cart-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed var(--border);
+        }
+        .qty-controls { display: flex; align-items: center; gap: 8px; }
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .action-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .btn-prime { background: var(--accent); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 15px; cursor: pointer; width: 100%; }
+        .btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; width: 100%; }
+
+        /* Styled Tables Shared Architecture */
+        .styled-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            border: 1px solid var(--border);
+        }
+        .styled-table th { background: #f1f5f9; padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+        .styled-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        
+        /* Modal Popup System View */
+        .modal-overlay {
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(15, 23, 42, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        .modal-card {
+            background: var(--surface);
+            padding: 24px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .modal-header { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+        .input-field {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+        }
+
+        /* Screen Confirmation Box Styling */
+        .confirmation-box {
+            background: #f1f5f9;
+            border-left: 4px solid var(--primary);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .confirmation-box div { margin-bottom: 4px; }
+        .confirmation-box strong { color: var(--text-main); }
+
+        /* Thermal Printing Output Blueprints */
+        #print-area { display: none; }
+        @media print {
+            body * { display: none; }
+            #print-area, #print-area * { display: block; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .pos-token {
+                width: 72mm;
+                padding: 4mm;
+                font-family: "Courier New", Courier, monospace;
+                color: #000;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            .brand-main { font-size: 16px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+            .pos-divider { border-bottom: 1px dashed #000; margin: 6px 0; }
+            .item-container { margin: 8px 0; }
+            .pos-item { font-size: 14px; font-weight: 900; text-transform: uppercase; }
+            .pos-qty { font-size: 13px; font-weight: 900; }
+            .meta-line { font-size: 10px; margin-top: 4px; }
+        }
+    </style>
+</head>
 <body>
 
-    <div id="print-area"></div>
+    <div class="navbar">
+        <div class="brand-title">AHMED HANIF RAJPUT (POS)</div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="btn-pos-tab" onclick="switchView('pos-tab')">Counter Dashboard</button>
+            <button class="tab-btn" id="btn-logs-tab" onclick="switchView('logs-tab')">Shift Logs Ledger</button>
+            <button class="tab-btn" id="btn-history-tab" onclick="switchView('history-tab')">Vault Archive</button>
+            <button class="tab-btn" onclick="attemptOpenCustomers()">Profiles Configuration</button>
+        </div>
+    </div>
 
-    <div class="app-container">
+    <div class="workspace">
         
         <div id="pos-tab" class="tab-content active">
-            <div class="pos-layout-grid">
-                
-                <div class="menu-selection-workspace">
-                    <div id="category-filter-container" class="filter-bar"></div>
-                    <div id="items-grid" class="cards-grid"></div>
+            <div class="pos-grid">
+                <div class="menu-side">
+                    <div class="category-bar" id="category-filter-container"></div>
+                    <div class="items-grid" id="items-grid"></div>
                 </div>
-
-                <div class="checkout-sidebar-workspace">
-                    <div class="sidebar-card">
-                        <div class="card-header-label">Queue Array Buffer</div>
-                        <div id="cart-container" class="dynamic-cart-list"></div>
-                        
-                        <div class="checkout-actions-row" style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button class="btn-primary-action" onclick="printTokens()" style="background: var(--accent); padding: 12px; font-weight: 700;">
-                                Issue Token
-                            </button>
-                            <button class="btn-refund-action" onclick="initiateCounterRefund()" style="background: var(--danger); color: white; border: none; padding: 12px; font-weight: 700; border-radius: 6px; cursor: pointer;">
-                                Reverse Token
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="sidebar-card" style="margin-top: 16px;">
-                        <div class="card-header-label">Shift Metrics Matrix</div>
-                        <div id="live-total-container"></div>
+                <div class="checkout-panel">
+                    <div class="panel-header">Queue Array Buffer</div>
+                    <div class="cart-list" id="cart-container"></div>
+                    <div class="action-stack">
+                        <button class="btn-prime" onclick="printTokens()">Generate & Print Token</button>
+                        <button class="btn-danger-outline" onclick="openCounterRefundModal()">Void Token Entry</button>
                     </div>
                 </div>
-
             </div>
         </div>
 
         <div id="logs-tab" class="tab-content">
-            <div class="section-title">Active Shift Live Stream Records</div>
-            <table class="styled-table">
-                <thead>
-                    <tr>
-                        <th style="width: 100px;">Time Node</th>
-                        <th style="width: 110px;">Token ID</th>
-                        <th>Profile / Item Breakdown Matrix</th>
-                        <th style="text-align: center; width: 120px;">Allocation Vol</th>
-                    </tr>
-                </thead>
-                <tbody id="live-log"></tbody>
-            </table>
+            <h2 style="margin-top:0; margin-bottom:16px;">Active Shift Activity Logs</h2>
+            <div style="display:grid; grid-template-columns: 1fr 340px; gap:24px; align-items: flex-start;">
+                <div>
+                    <h3 style="font-size:15px; color:var(--text-muted);">Active Stream Inflow Signals</h3>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Token UID</th>
+                                <th>Identity Group</th>
+                                <th>Menu Item Allocation</th>
+                                <th style="text-align:right;">Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="live-log"></tbody>
+                    </table>
 
-            <div class="section-title" style="margin-top: 32px; color: var(--danger);">Voided Log History Archive</div>
-            <table class="styled-table" style="border-top: 2px solid var(--danger);">
-                <thead>
-                    <tr>
-                        <th style="width: 100px;">Time Node</th>
-                        <th style="width: 110px;">Token ID</th>
-                        <th>Profile / Item Breakdown Matrix</th>
-                        <th style="text-align: center; width: 120px;">Voided Volume</th>
-                    </tr>
-                </thead>
-                <tbody id="refund-log"></tbody>
-            </table>
+                    <h3 style="font-size:15px; color:var(--danger); margin-top:24px;">Terminated Void Signals Ledger</h3>
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Token UID</th>
+                                <th>Identity Group</th>
+                                <th>Menu Item Allocation</th>
+                                <th style="text-align:right;">Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="refund-log"></tbody>
+                    </table>
+                </div>
+                <div style="background:white; border:1px solid var(--border); padding:20px; border-radius:14px;" id="live-total-container"></div>
+            </div>
+        </div>
+
+        <div id="history-tab" class="tab-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h2 style="margin:0;">Vault Ledger History Index</h2>
+                <button class="btn-danger-outline" style="width:auto; padding:8px 16px;" onclick="clearAllHistory()">Wipe Vault Records</button>
+            </div>
+            <div id="history-container" style="display:flex; flex-direction:column; gap:16px;"></div>
+        </div>
+
+        <div id="customers-tab" class="tab-content">
+            <h2>Profiles Registry Configuration</h2>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px;">
+                <div style="background:white; border:1px solid var(--border); padding:20px; border-radius:12px;">
+                    <h3>Add Profile Identity</h3>
+                    <input type="text" class="input-field" id="new-manual-customer" placeholder="Enter Full Name...">
+                    <button class="btn-prime" onclick="addCustomerManually()">Add to Registry</button>
+                </div>
+                <div style="background:white; border:1px solid var(--border); padding:20px; border-radius:12px;">
+                    <h3>Consolidate Profiles (Merge)</h3>
+                    <select class="input-field" id="merge-source-select"></select>
+                    <select class="input-field" id="merge-target-select"></select>
+                    <button class="btn-prime" style="background:var(--primary);" onclick="executeCustomerMerge()">Execute Merge</button>
+                </div>
+            </div>
+            <div style="background:white; border:1px solid var(--border); padding:20px; border-radius:12px;">
+                <h3>Active Registry Profiles</h3>
+                <input type="text" class="input-field" id="customer-search-input" oninput="handleCustomerSearchFilter()" placeholder="Search profiles...">
+                <div id="customer-management-list"></div>
+            </div>
+            <div style="background:white; border:1px solid var(--border); padding:20px; border-radius:12px; margin-top:24px;" id="menu-weights-management-container"></div>
         </div>
 
     </div>
 
-    <div id="secure-pin-modal" class="modal-overlay-backdrop" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:9999;">
-        <div class="modal-surface-box" style="background:white; padding:24px; border-radius:8px; width:340px; box-shadow:0 12px 32px rgba(0,0,0,0.25);">
-            <div id="modal-title-text" style="font-weight:700; margin-bottom:14px; color:#1e293b;">Validation Pin Required</div>
-            <input type="password" id="modal-pin-input" class="input-field" placeholder="••••" style="width:100%; font-size:24px; text-align:center; padding:8px; letter-spacing:6px; margin-bottom:16px;">
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button class="btn-action-small" onclick="closePinModal()" style="background:#e2e8f0; color:#475569;">Cancel</button>
-                <button class="btn-action-small" onclick="submitPinModal()" style="background:var(--primary); color:white;">Submit</button>
+    <div class="modal-overlay" id="secure-pin-modal">
+        <div class="modal-card">
+            <div class="modal-header" id="modal-title-text">Authorization Required</div>
+            <input type="password" class="input-field" id="modal-pin-input" placeholder="••••">
+            <div style="display:flex; gap:8px;">
+                <button class="btn-prime" onclick="submitPinModal()">Verify</button>
+                <button class="btn-danger-outline" style="padding:10px;" onclick="closePinModal()">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="customer-name-modal" class="modal-overlay-backdrop" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:9999;">
-        <div class="modal-surface-box" style="background:white; padding:24px; border-radius:8px; width:360px;">
-            <div style="font-weight:700; margin-bottom:12px; color:#1e293b;">Assign Profile Registry Identity</div>
-            <input type="text" id="cust-modal-name-input" class="input-field" list="customer-memory-list" placeholder="Enter name or scan code..." style="width:100%; padding:10px; margin-bottom:16px;">
+    <div class="modal-overlay" id="customer-name-modal">
+        <div class="modal-card">
+            <div class="modal-header">Assign Profile Registry Mapping</div>
+            <input type="text" class="input-field" id="cust-modal-name-input" placeholder="Type name..." list="customer-memory-list">
             <datalist id="customer-memory-list"></datalist>
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button class="btn-action-small" onclick="closeCustomerModal()" style="background:#e2e8f0; color:#475569;">Skip</button>
-                <button class="btn-action-small" onclick="submitCustomerModal()" style="background:var(--accent); color:white;">Proceed</button>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-prime" onclick="submitCustomerModal()">Confirm Print Sequence</button>
+                <button class="btn-danger-outline" style="padding:10px;" onclick="closeCustomerModal()">Cancel</button>
             </div>
         </div>
     </div>
 
+    <div class="modal-overlay" id="pos-refund-modal">
+        <div class="modal-card" style="max-width:450px;">
+            <div class="modal-header">Void Token Registry Search</div>
+            
+            <div id="refund-search-step">
+                <input type="number" class="input-field" id="refund-token-input" placeholder="Enter Token Number (e.g. 1001)">
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-prime" style="background:var(--primary);" onclick="lookupTokenForRefund()">Verify Token</button>
+                    <button class="btn-danger-outline" style="padding:10px;" onclick="closeCounterRefundModal()">Cancel</button>
+                </div>
+            </div>
+
+            <div id="refund-confirm-step" style="display:none;">
+                <div class="confirmation-box" id="refund-verification-box"></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-prime" style="background:var(--danger);" onclick="confirmTokenRefundAction()">Confirm and Void</button>
+                    <button class="btn-danger-outline" style="padding:10px; color:var(--text-main); border-color:var(--border);" onclick="resetCounterRefundModal()">Back</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <script src="script.js"></script>
 </body>
+</html>
