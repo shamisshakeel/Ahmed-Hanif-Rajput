@@ -23,6 +23,7 @@ let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
 
 let activeCallback = null;
 let requiredPinType = 'refund'; 
+let activeCustomerSearchQuery = "";
 
 // Date String Sanitizer & Normalizer Engine
 function normalizeToSystemDate(rawDateString) {
@@ -90,7 +91,7 @@ function findClosestCustomerName(inputName) {
 function populateCustomerDatalist() {
     const dataList = document.getElementById('customer-memory-list');
     dataList.innerHTML = '';
-    knownCustomers.forEach(name => {
+    knownCustomers.sort().forEach(name => {
         let option = document.createElement('option');
         option.value = name;
         dataList.appendChild(option);
@@ -137,10 +138,11 @@ function submitPinModal() {
 }
 
 function attemptOpenCustomers() {
-    openPinModal("Enter Management Keys to Unlocked Configuration Panel", "admin", function() {
+    openPinModal("Enter Management Keys to Unlock Configuration Panel", "admin", function() {
         switchView('customers-tab');
         renderCustomerManagement();
         renderMenuWeightsManagement();
+        populateMergeDropdowns();
     });
 }
 
@@ -153,14 +155,25 @@ function attemptOpenConsumption() {
     });
 }
 
-// Identity Registry Profile Controls View Renderers
+// Identity Registry Profile Controls & Dynamic Search
+function handleCustomerSearchFilter() {
+    activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
+    renderCustomerManagement();
+}
+
 function renderCustomerManagement() {
     const listDiv = document.getElementById('customer-management-list');
     listDiv.innerHTML = '';
-    if (knownCustomers.length === 0) {
-        listDiv.innerHTML = '<p style="color:var(--text-muted); padding: 12px 0;">No entity registry indexes tracked.</p>';
+    
+    let filteredCustomers = knownCustomers.filter(cust => 
+        cust.toLowerCase().includes(activeCustomerSearchQuery)
+    );
+
+    if (filteredCustomers.length === 0) {
+        listDiv.innerHTML = '<p style="color:var(--text-muted); padding: 12px 0;">No matching identity profiles found.</p>';
         return;
     }
+    
     let table = `<table class="styled-table">
         <thead>
             <tr>
@@ -169,17 +182,157 @@ function renderCustomerManagement() {
             </tr>
         </thead>
         <tbody>`;
-    knownCustomers.forEach((cust, index) => {
+        
+    filteredCustomers.forEach((cust) => {
+        let actualIndex = knownCustomers.indexOf(cust);
         table += `<tr>
             <td style="font-weight:600; color:var(--text-main);">${cust}</td>
             <td style="text-align:right;">
-                <button class="btn-action-small btn-edit" onclick="editCustomer(${index})">Modify</button>
-                <button class="btn-action-small btn-refund" onclick="deleteCustomer(${index})">Purge</button>
+                <button class="btn-action-small btn-edit" onclick="editCustomer(${actualIndex})">Modify</button>
+                <button class="btn-action-small btn-refund" onclick="deleteCustomer(${actualIndex})">Purge</button>
             </td>
         </tr>`;
     });
     table += `</tbody></table>`;
     listDiv.innerHTML = table;
+}
+
+// Customer Profile Merging Core Logic
+function populateMergeDropdowns() {
+    let srcSelect = document.getElementById('merge-source-select');
+    let tgtSelect = document.getElementById('merge-target-select');
+    
+    srcSelect.innerHTML = '<option value="">-- Select Duplicate Profile (To Merge From) --</option>';
+    tgtSelect.innerHTML = '<option value="">-- Select Target Primary Master Profile --</option>';
+    
+    let sortedCustomers = [...knownCustomers].sort();
+    sortedCustomers.forEach(cust => {
+        srcSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+        tgtSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+    });
+}
+
+function executeCustomerMerge() {
+    let source = document.getElementById('merge-source-select').value;
+    let target = document.getElementById('merge-target-select').value;
+    
+    if(!source || !target) {
+        alert("Please select both a source duplicate profile and a target master profile.");
+        return;
+    }
+    if(source === target) {
+        alert("Cannot merge a profile into itself.");
+        return;
+    }
+    
+    if(!confirm(`Are you absolutely sure you want to merge "${source}" into "${target}"?\nAll history records, shift logs, and analytics data will be combined into "${target}", and "${source}" will be deleted.`)) {
+        return;
+    }
+    
+    // 1. Rewrite current runtime active shift logs
+    currentDayLog.forEach(log => {
+        if(log.customer === source) log.customer = target;
+    });
+    localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+    
+    // 2. Rewrite current refund logs
+    currentRefundLog.forEach(log => {
+        if(log.customer === source) log.customer = target;
+    });
+    localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
+    
+    // 3. Rewrite chronological history data cards
+    allTimeHistory.forEach(day => {
+        if (day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => {
+                if (entry.customer === source) entry.customer = target;
+            });
+        }
+    });
+    localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    
+    // 4. Remove old duplicate source reference from array
+    let srcIdx = knownCustomers.indexOf(source);
+    if(srcIdx > -1) knownCustomers.splice(srcIdx, 1);
+    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+    
+    alert(`Customer Record Integration Successful! "${source}" has been combined into "${target}".`);
+    
+    populateCustomerDatalist();
+    populateMergeDropdowns();
+    renderCustomerManagement();
+    renderLogs();
+}
+
+// System Backup and Data Restoration System
+function exportSystemBackupJSON() {
+    let backupPayload = {
+        categorizedMenu: customItems,
+        currentDayLog: currentDayLog,
+        currentRefundLog: currentRefundLog,
+        allTimeHistory: allTimeHistory,
+        knownCustomers: knownCustomers,
+        shiftStartTime: shiftStartTime
+    };
+    
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
+    let downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `AHRP_POS_SYSTEM_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+}
+
+function importSystemBackupJSON() {
+    let fileInput = document.getElementById('import-backup-file');
+    if(fileInput.files.length === 0) {
+        alert("Please select a valid (.json) backup database template file first.");
+        return;
+    }
+    
+    if(!confirm("CRITICAL WARNING: This action will completely overwrite all local application data, current shift data, history ledgers, and configurations. Proceed?")) {
+        return;
+    }
+    
+    let selectedFile = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            let parsedData = JSON.parse(event.target.result);
+            
+            // Comprehensive integrity checks to ensure no wrong inputs are imported
+            if(!parsedData.categorizedMenu || !parsedData.knownCustomers || !parsedData.allTimeHistory) {
+                throw new Error("Invalid schema tracking configuration variables.");
+            }
+            
+            localStorage.setItem('categorizedMenu', JSON.stringify(parsedData.categorizedMenu));
+            localStorage.setItem('currentDayLog', JSON.stringify(parsedData.currentDayLog || []));
+            localStorage.setItem('currentRefundLog', JSON.stringify(parsedData.currentRefundLog || []));
+            localStorage.setItem('allTimeHistory', JSON.stringify(parsedData.allTimeHistory || []));
+            localStorage.setItem('knownCustomers', JSON.stringify(parsedData.knownCustomers || []));
+            if(parsedData.shiftStartTime) {
+                localStorage.setItem('shiftStartTime', parsedData.shiftStartTime);
+            } else {
+                localStorage.removeItem('shiftStartTime');
+            }
+            
+            // Reload global variables state
+            customItems = parsedData.categorizedMenu;
+            currentDayLog = parsedData.currentDayLog || [];
+            currentRefundLog = parsedData.currentRefundLog || [];
+            allTimeHistory = parsedData.allTimeHistory || [];
+            knownCustomers = parsedData.knownCustomers || [];
+            shiftStartTime = parsedData.shiftStartTime || null;
+            
+            alert("Database Memory Override Successfully Restored!");
+            location.reload(); // Refresh viewport layout to display imported state variables
+            
+        } catch(err) {
+            alert("Error parsing memory file: Invalid or corrupted JSON backup package schema layout.\n" + err.message);
+        }
+    };
+    reader.readAsText(selectedFile);
 }
 
 function renderMenuWeightsManagement() {
@@ -234,6 +387,7 @@ function addCustomerManually() {
         knownCustomers.push(name);
         localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
         populateCustomerDatalist();
+        populateMergeDropdowns();
         renderCustomerManagement();
         input.value = '';
     } else {
@@ -261,6 +415,7 @@ function editCustomer(index) {
     });
     localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
     populateCustomerDatalist();
+    populateMergeDropdowns();
     renderCustomerManagement();
     renderLogs();
 }
@@ -271,6 +426,7 @@ function deleteCustomer(index) {
         knownCustomers.splice(index, 1);
         localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
         populateCustomerDatalist();
+        populateMergeDropdowns();
         renderCustomerManagement();
     }
 }
@@ -326,7 +482,6 @@ function getItemCategory(itemName) {
     return found ? found.category : "Others";
 }
 
-// Returns standard unit weight scale metric values
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
@@ -529,7 +684,7 @@ function renderLogs() {
     });
 }
 
-// Void & Deletion Execution Intercept Handlers
+// Void Execution Intercept Handlers
 function refundLogItem(index) {
     if (!confirm("Execute target data structure mutation termination override script?")) return;
     openPinModal("Verification authorization protocols requested.", "refund", function() {
@@ -676,7 +831,20 @@ function clearAllHistory() {
     });
 }
 
-// Operational Lifecycle Segment Closures (End Shift Logs Vault Builder)
+// Operational Lifecycle Segment Closures (Open & End Shift Engine Routing)
+function attemptStartNewDay() {
+    openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
+        startNewDay();
+        alert("New operational tracking register open.");
+    });
+}
+
+function startNewDay() {
+    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
+    localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
+    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
+}
+
 function endDay() {
     if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state queue registry matrices isolated as null.");
     if (!confirm("Terminate current operational runtime cycle window parameters and shift dataset structures?")) return;
@@ -719,12 +887,6 @@ function endDay() {
         renderLogs();
         switchView('history-tab');
     });
-}
-
-function startNewDay() {
-    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
-    localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
 }
 
 // Consumption Engine Matrix Ledger calculations
