@@ -476,12 +476,12 @@ body {
 .btn-reset-gray:hover { background: #e2e8f0; }
 
 /* -------------------------------------------------------------
-   THERMAL PRINTING ENGINE OVERRIDES (Fixed Layout Right Cutoffs)
+   THERMAL PRINTING ENGINE OVERRIDES (80mm & 74mm Printable View)
    ------------------------------------------------------------- */
 @media print {
     @page { 
         size: 80mm auto; 
-        margin: 0mm 0mm 0mm 0mm !important; /* Zeroed to control inside wrapper */
+        margin: 0mm 3mm 0mm 3mm !important; 
     }
     html, body { 
         background: #ffffff !important; 
@@ -495,8 +495,8 @@ body {
     
     #print-area { 
         display: block !important; 
-        width: 70mm !important; 
-        margin: 0px 0px 0px 2mm !important; /* Shifter slightly left into printable safety bounds */
+        width: 72mm !important; 
+        margin: 0 auto !important; 
         padding: 2mm 0mm !important;
     }
     
@@ -508,7 +508,6 @@ body {
         font-family: 'Courier New', Courier, monospace, sans-serif !important; 
         page-break-inside: avoid !important;
         color: #000000 !important;
-        padding-right: 4mm !important; /* Safety padding space to prevent clipping variables */
     }
     
     .pos-token { 
@@ -523,7 +522,6 @@ body {
         color: #000000 !important; 
         text-align: center; 
         margin-bottom: 4px;
-        padding-right: 2mm;
     }
     
     .pos-divider { width: 100%; border-top: 2px solid #000000 !important; margin: 6px 0; }
@@ -586,7 +584,7 @@ body {
         font-size: 14px !important; 
         font-weight: 900 !important; 
         margin: 4px 0 !important; 
-        padding-right: 6mm !important; /* Shifted values cleanly inside the paper wrap bounds */
+        padding-right: 22px !important; 
     }
     
     .highlight-box { 
@@ -594,6 +592,5 @@ body {
         padding: 6px; 
         margin: 8px 0; 
         text-align: center;
-        margin-right: 4mm;
     }
 }
