@@ -477,11 +477,13 @@ function renderCategoryFilters() {
     });
 }
 
+// Workspace Category & Weight Helpers
 function getItemCategory(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found ? found.category : "Others";
 }
 
+// Get dynamic unit scaling weight factor
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
@@ -833,6 +835,7 @@ function clearAllHistory() {
 
 // Operational Lifecycle Segment Closures (Open & End Shift Engine Routing)
 function attemptStartNewDay() {
+    // Correctly routes validation through the modal using the master variable '787898'
     openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
         startNewDay();
         alert("New operational tracking register open.");
