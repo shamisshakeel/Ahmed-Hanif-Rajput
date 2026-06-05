@@ -3,177 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AHMED HANIF RAJPUT - POS System</title>
+    <title>AHMED HANIF RAJPUT - Counter POS Hub</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <header class="main-header">
-        <div class="brand-title">AHMED HANIF RAJPUT</div>
-        <nav class="nav-tabs">
+    <nav class="navbar">
+        <div class="nav-brand">AHMED HANIF RAJPUT</div>
+        <div class="nav-links">
             <button class="tab-btn active" id="btn-pos-tab" onclick="switchView('pos-tab')">Counter POS</button>
-            <button class="tab-btn" id="btn-logs-tab" onclick="switchView('logs-tab')">Live Logs</button>
-            <button class="tab-btn" id="btn-history-tab" onclick="switchView('history-tab')">Vault Ledger</button>
-            <button class="tab-btn" onclick="attemptOpenCustomers()">Profiles Config</button>
-            <button class="tab-btn" onclick="attemptOpenConsumption">Analytics Engine</button>
-        </nav>
-    </header>
+            <button class="tab-btn" id="btn-logs-tab" onclick="switchView('logs-tab')">Live Shift Logs</button>
+            <button class="tab-btn" id="btn-history-tab" onclick="switchView('history-tab')">Vault Ledgers</button>
+            <button class="tab-btn" onclick="attemptOpenCustomers()">Profiles Configuration</button>
+            <button class="tab-btn" onclick="attemptOpenConsumption()">Analytic Engine</button>
+        </div>
+    </nav>
 
-    <main class="workspace-container">
+    <div class="app-container">
         
-        <section id="pos-tab" class="tab-content active">
+        <div id="pos-tab" class="tab-content active">
             <div class="pos-layout">
-                <div class="menu-workspace">
+                <div class="menu-column">
                     <div id="category-filter-container" class="category-bar"></div>
                     <div id="items-grid" class="items-grid"></div>
                 </div>
-
-                <div class="control-panel">
-                    <div class="panel-section">
-                        <h3>Active Queue Buffer</h3>
-                        <div id="cart-container" class="cart-container"></div>
-                        <div class="cart-actions-grid">
-                            <button class="btn-primary" onclick="printTokens()">Print Token Order</button>
-                            <button class="btn-danger-outline" onclick="openPosVoidModal()">Void via Token ID</button>
+                
+                <div class="cart-column">
+                    <div class="panel-card">
+                        <h3 class="panel-title">Active Queue Buffer</h3>
+                        <div id="cart-container" class="cart-buffer"></div>
+                        
+                        <div class="pos-action-gate">
+                            <button class="btn-main btn-print" onclick="printTokens()">Execute Print Tokens</button>
+                            <button class="btn-main btn-void-desk" onclick="initiateTokenVoidSequence()">Void Token Desk</button>
                         </div>
                     </div>
-
-                    <div class="panel-section">
-                        <h3>Live Shift Inventory Metrics</h3>
+                    
+                    <div class="panel-card" style="margin-top: 16px;">
+                        <h3 class="panel-title">Live Dynamic Summary Matrix</h3>
                         <div id="live-total-container"></div>
-                        <div class="shift-actions-grid">
-                            <button class="btn-accent" onclick="attemptStartNewDay()">Open New Shift</button>
-                            <button class="btn-danger" onclick="endDay()">End Active Shift</button>
+                        <div class="shift-gate-controls">
+                            <button class="btn-action-small btn-edit" onclick="attemptStartNewDay()">Open New Shift</button>
+                            <button class="btn-action-small btn-refund" onclick="endDay()">Terminate Shift Day</button>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <section id="logs-tab" class="tab-content">
-            <div class="logs-layout">
-                <div class="log-card">
-                    <h3>Active Operational Sales Log Stream</h3>
-                    <div class="table-wrapper">
-                        <table class="styled-table">
-                            <thead>
-                                <tr>
-                                    <th>Token ID</th>
-                                    <th>Timestamp</th>
-                                    <th>Registry Profile Name</th>
-                                    <th>Item Target</th>
-                                    <th>Quantity Mapping</th>
-                                </tr>
-                            </thead>
-                            <tbody id="live-log"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="log-card">
-                    <h3>Terminated Void Audit Trail</h3>
-                    <div class="table-wrapper">
-                        <table class="styled-table">
-                            <thead>
-                                <tr>
-                                    <th>Token ID</th>
-                                    <th>Timestamp</th>
-                                    <th>Registry Profile Name</th>
-                                    <th>Item Target</th>
-                                    <th>Quantity Matrix</th>
-                                </tr>
-                            </thead>
-                            <tbody id="refund-log"></tbody>
-                        </table>
-                    </div>
+        <div id="logs-tab" class="tab-content">
+            <div class="panel-card">
+                <h3 class="panel-title">Chronological Live Operations Stream</h3>
+                <div class="table-scroll">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Token Number</th>
+                                <th>Registry Target Profile</th>
+                                <th>Menu Label</th>
+                                <th style="text-align: right;">Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="live-log"></tbody>
+                    </table>
                 </div>
             </div>
-        </section>
 
-        <section id="history-tab" class="tab-content">
-            <div class="ledger-actions">
-                <h2>Historical Shift Vault Registries</h2>
-                <button class="btn-danger-outline" onclick="clearAllHistory()">Wipe Master History Index</button>
+            <div class="panel-card" style="margin-top: 20px;">
+                <h3 class="panel-title">Terminated Liquidated Void Stream Logs</h3>
+                <div class="table-scroll">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Token Number</th>
+                                <th>Registry Target Profile</th>
+                                <th>Menu Label</th>
+                                <th style="text-align: right;">Quantity State</th>
+                            </tr>
+                        </thead>
+                        <tbody id="refund-log"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="history-tab" class="tab-content">
+            <div class="history-actions-bar">
+                <h3>Historical Epoch Shift Ledgers</h3>
+                <button class="btn-action-small btn-refund" onclick="clearAllHistory()">Purge History Vault</button>
             </div>
             <div id="history-container" class="history-grid"></div>
-        </section>
+        </div>
 
-        <section id="customers-tab" class="tab-content">
-            <div class="config-grid">
-                <div class="panel-section">
-                    <h3>Profile Directory Management</h3>
-                    <div class="search-box">
-                        <input type="text" id="customer-search-input" class="input-field" placeholder="Search accounts..." oninput="handleCustomerSearchFilter()">
+        <div id="customers-tab" class="tab-content">
+            <div class="pos-layout">
+                <div class="menu-column">
+                    <div class="panel-card">
+                        <h3 class="panel-title">Add New Custom Menu Node</h3>
+                        <div class="inline-form-grid">
+                            <input type="text" id="new-item-name" class="input-field" placeholder="Item Name">
+                            <select id="new-item-category" class="input-field">
+                                <option value="Rice">Rice</option>
+                                <option value="Curry">Curry</option>
+                                <option value="Bread">Bread</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <input type="number" id="new-item-weight" class="input-field" placeholder="Weight (g)">
+                            <button class="btn-main btn-print" onclick="addNewItem()">Add Menu Item</button>
+                        </div>
                     </div>
-                    <div class="inline-form">
-                        <input type="text" id="new-manual-customer" class="input-field" placeholder="Add custom profile name...">
-                        <button class="btn-primary" onclick="addCustomerManually()">Register</button>
-                    </div>
-                    <div id="customer-management-list"></div>
+                    <div id="menu-weights-management-container" style="margin-top: 16px;"></div>
                 </div>
-                
-                <div class="panel-section">
-                    <h3>Profile Consolidation & Merging Engine</h3>
-                    <div class="select-form">
-                        <select id="merge-source-select" class="input-field"></select>
-                        <select id="merge-target-select" class="input-field"></select>
-                        <button class="btn-danger" onclick="executeCustomerMerge()">Execute Profile Merge</button>
+
+                <div class="cart-column">
+                    <div class="panel-card">
+                        <h3 class="panel-title">Manual Identity Registration</h3>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <input type="text" id="new-manual-customer" class="input-field" placeholder="Capitalized Full Name">
+                            <button class="btn-main btn-print" style="width: auto; padding: 0 16px;" onclick="addCustomerManually()">Register</button>
+                        </div>
+                        <input type="text" id="customer-search-input" class="input-field" placeholder="Search Filter Registry Profiles..." oninput="handleCustomerSearchFilter()">
+                        <div id="customer-management-list" style="margin-top: 12px; max-height: 250px; overflow-y: auto;"></div>
                     </div>
-                    <div id="menu-weights-management-container"></div>
+
+                    <div class="panel-card" style="margin-top: 16px;">
+                        <h3 class="panel-title">Profile Database Duplication Merging</h3>
+                        <select id="merge-source-select" class="input-field" style="margin-bottom:8px;"></select>
+                        <select id="merge-target-select" class="input-field" style="margin-bottom:12px;"></select>
+                        <button class="btn-main btn-void-desk" onclick="executeCustomerMerge()">Execute Profile Structural Integration</button>
+                    </div>
+
+                    <div class="panel-card" style="margin-top: 16px;">
+                        <h3 class="panel-title">System Infrastructure Backups</h3>
+                        <button class="btn-main btn-print" style="margin-bottom:12px;" onclick="exportSystemBackupJSON()">Generate System Backup JSON</button>
+                        <div style="border-top:1px dashed var(--border); padding-top:12px;">
+                            <input type="file" id="import-backup-file" accept=".json" class="input-field" style="margin-bottom:8px;">
+                            <button class="btn-main btn-void-desk" onclick="importSystemBackupJSON()">Restore System Backup File</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
 
-    <div id="secure-pin-modal" class="modal-backdrop">
-        <div class="modal-card">
-            <h3 id="modal-title-text">Verification Checkpoint</h3>
-            <input type="password" id="modal-pin-input" class="input-field centralized" placeholder="••••••">
+        <div id="consumption-tab" class="tab-content">
+            <div class="panel-card">
+                <h3 class="panel-title">Anomalous Threshold Boundary Engine</h3>
+                <div class="inline-form-grid">
+                    <div>
+                        <label class="label-text">Select Segment Scope</label>
+                        <select id="rule-shift-selector" class="input-field" onchange="renderConsumptionReport()"></select>
+                    </div>
+                    <div>
+                        <label class="label-text">Rice Limit Trigger</label>
+                        <input type="number" id="rule-rice-limit" class="input-field" placeholder="e.g. 5" oninput="renderConsumptionReport()">
+                    </div>
+                    <div>
+                        <label class="label-text">Curry Limit Trigger</label>
+                        <input type="number" id="rule-curry-limit" class="input-field" placeholder="e.g. 4" oninput="renderConsumptionReport()">
+                    </div>
+                    <div>
+                        <label class="label-text">Bread Limit Trigger</label>
+                        <input type="number" id="rule-bread-limit" class="input-field" placeholder="e.g. 20" oninput="renderConsumptionReport()">
+                    </div>
+                </div>
+                <div class="table-scroll" style="margin-top:16px;">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Profile Key</th>
+                                <th>Item Label</th>
+                                <th>Category</th>
+                                <th style="text-align:right;">Units Traversed</th>
+                                <th style="text-align:right;">Mass Quantization</th>
+                                <th>Status Diagnostics</th>
+                            </tr>
+                        </thead>
+                        <tbody id="high-consumption-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card" style="margin-top: 20px;">
+                <div class="history-actions-bar">
+                    <h3 class="panel-title">Granular Filter Relational Vectors</h3>
+                    <button class="btn-action-small btn-edit" onclick="exportConsumptionToCSV()">Export Dataset Matrix to CSV</button>
+                </div>
+                <div class="inline-form-grid" style="margin-bottom: 16px;">
+                    <select id="filter-cust" class="input-field" onchange="renderConsumptionReport()"></select>
+                    <select id="filter-item" class="input-field" onchange="renderConsumptionReport()"></select>
+                    <select id="filter-date" class="input-field" onchange="renderConsumptionReport()"></select>
+                    <button class="btn-action-small btn-refund" onclick="clearConsumptionFilters()">Reset Parameters</button>
+                </div>
+                <div class="table-scroll">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Temporal Timestamp</th>
+                                <th>Identity Mapping</th>
+                                <th>Item Descriptor</th>
+                                <th style="text-align:right;">Qty Scalar</th>
+                                <th style="text-align:right;">Weight Vol</th>
+                                <th>State Vector</th>
+                            </tr>
+                        </thead>
+                        <tbody id="consumption-report-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <datalist id="customer-memory-list"></datalist>
+
+    <div id="secure-pin-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 id="modal-title-text" class="modal-header">Security Gateway</h3>
+            <input type="password" id="modal-pin-input" class="input-field modal-input" placeholder="Enter Secure Master PIN Code">
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="closePinModal()">Abort</button>
-                <button class="btn-accent" onclick="submitPinModal()">Verify Credentials</button>
+                <button class="btn-action-small btn-edit" onclick="submitPinModal()">Authorize Execution</button>
+                <button class="btn-action-small btn-refund" onclick="closePinModal()">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="pos-void-input-modal" class="modal-backdrop">
-        <div class="modal-card">
-            <h3>POS Counter Void Matrix</h3>
-            <p>Input target Token Number reference key string below:</p>
-            <input type="number" id="void-token-number-input" class="input-field centralized" placeholder="e.g. 1001">
+    <div id="customer-name-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 class="modal-header">Assign Profile Identity Handle</h3>
+            <input type="text" id="cust-modal-name-input" class="input-field modal-input" placeholder="Enter Customer Name or Registry Match Key" list="customer-memory-list">
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="closePosVoidModal()">Cancel</button>
-                <button class="btn-primary" onclick="submitPosVoidLookup()">Query Log Instance</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="pos-void-confirm-modal" class="modal-backdrop">
-        <div class="modal-card detailed-confirm">
-            <div class="alert-header-pill">⚠️ Transaction Audit Verification</div>
-            <h3>Verify Targeted Entry Details</h3>
-            <div class="verification-data-box" id="void-confirmation-details-box"></div>
-            <p class="warning-text">Confirm terminal data mutation override execution string? Data will be cleanly archived to Void logs.</p>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closePosVoidConfirmModal()">Abort Overwrite</button>
-                <button class="btn-danger" onclick="executeConfirmedPosVoid()">Execute Terminal Mutation</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="customer-name-modal" class="modal-backdrop">
-        <div class="modal-card">
-            <h3>Identity Mapping Profile Target</h3>
-            <input type="text" id="cust-modal-name-input" class="input-field" placeholder="Enter name or scan index token..." list="customer-memory-list">
-            <datalist id="customer-memory-list"></datalist>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeCustomerModal()">Cancel</button>
-                <button class="btn-primary" onclick="submitCustomerModal()">Assign & Print</button>
+                <button class="btn-action-small btn-edit" onclick="submitCustomerModal()">Commit Transaction</button>
+                <button class="btn-action-small btn-refund" onclick="closeCustomerModal()">Abort</button>
             </div>
         </div>
     </div>
 
     <div id="print-area"></div>
 
+    <script src="script.js"></script>
 </body>
 </html>
