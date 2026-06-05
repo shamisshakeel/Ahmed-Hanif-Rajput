@@ -1,5 +1,5 @@
-// Initial Core Architecture Arrays Setup
-const defaultStructuredItems = [
+// Base Menu Items Architecture Matrix
+let defaultStructuredItems = [
     { name: "Chicken Biryani", category: "Rice", weight: 0 },
     { name: "Beef Biryani", category: "Rice", weight: 0 },
     { name: "Beef Pulao", category: "Rice", weight: 0 },
@@ -10,7 +10,7 @@ const defaultStructuredItems = [
     { name: "Chapati", category: "Bread", weight: 0 }
 ];
 
-// Persistent States Mapping Initialization via LocalStorage API
+// LocalStorage Persistent Global States Initialization
 let customItems = JSON.parse(localStorage.getItem('categorizedMenu')) || defaultStructuredItems;
 let currentActiveCategory = "All";
 
@@ -21,40 +21,108 @@ let allTimeHistory = JSON.parse(localStorage.getItem('allTimeHistory')) || [];
 let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
 
-// Incremental Token Counter Seed Matrix Tracking Tracker
-let nextGlobalTokenId = parseInt(localStorage.getItem('nextGlobalTokenId')) || 1001;
+// Persistent Global Token Sequence Tracker Engine
+let nextTokenSequence = parseInt(localStorage.getItem('nextTokenSequence')) || 1;
 
-// Internal Void Query Workspace Buffer Reference Holders
-let activeVoidTargetIndex = null;
 let activeCallback = null;
 let requiredPinType = 'refund'; 
 let activeCustomerSearchQuery = "";
 
-// System Normalizer Engine Logic Modules
+// Sequential Token Number String Formatter Utility
+function generateRollingTokenNumber() {
+    let tokenStr = String(nextTokenSequence).padStart(4, '0');
+    nextTokenSequence++;
+    if (nextTokenSequence > 9999) nextTokenSequence = 1; // Rolling loop parameter boundaries
+    localStorage.setItem('nextTokenSequence', nextTokenSequence);
+    return tokenStr;
+}
+
+// Date String Sanitizer & Normalizer Engine
+function normalizeToSystemDate(rawDateString) {
+    if (!rawDateString) return getFormattedSystemDate();
+    let workingString = rawDateString.split('(')[0].trim();
+    let parsedDate = new Date(workingString);
+    if (isNaN(parsedDate.getTime())) {
+        let match = workingString.match(/^(\d+)[./-](\d+)[./-](\d+)/);
+        if (match) {
+            let parts = workingString.split(/[./-]/);
+            if(parts[0].length === 4) {
+                parsedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            } else {
+                parsedDate = new Date(parts[2], parts[0] - 1, parts[1]);
+            }
+        }
+    }
+    return isNaN(parsedDate.getTime()) ? rawDateString : getFormattedSystemDate(parsedDate);
+}
+
 function getFormattedSystemDate(dateObj = new Date()) {
     const day = dateObj.getDate();
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     return `${day} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
 }
 
-function normalizeToSystemDate(rawDateString) {
-    if (!rawDateString) return getFormattedSystemDate();
-    let workingString = rawDateString.split('(')[0].trim();
-    let parsedDate = new Date(workingString);
-    return isNaN(parsedDate.getTime()) ? rawDateString : getFormattedSystemDate(parsedDate);
+// Levenshtein String Proximity Matcher
+function getLevenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+    for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
 }
 
-// Workspace Swapping Engine
+function findClosestCustomerName(inputName) {
+    let cleanInput = inputName.trim().toLowerCase();
+    let bestMatch = null;
+    let lowestDistance = Infinity;
+    for (let known of knownCustomers) {
+        let cleanKnown = known.toLowerCase();
+        let distance = getLevenshteinDistance(cleanInput, cleanKnown);
+        let threshold = cleanInput.length <= 4 ? 1 : 2; 
+        if (distance <= threshold && distance < lowestDistance) {
+            lowestDistance = distance;
+            bestMatch = known;
+        }
+    }
+    return bestMatch;
+}
+
+function populateCustomerDatalist() {
+    const dataList = document.getElementById('customer-memory-list');
+    dataList.innerHTML = '';
+    knownCustomers.sort().forEach(name => {
+        let option = document.createElement('option');
+        option.value = name;
+        dataList.appendChild(option);
+    });
+}
+
+// Router Workspace Tab Switch View Controller
 function switchView(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(element => element.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    const targetedTabBtn = document.getElementById('btn-' + tabId);
-    if(targetedTabBtn) targetedTabBtn.classList.add('active');
-    if (tabId === 'history-tab' || tabId === 'logs-tab') renderLogs();
+    document.querySelectorAll('.tab-btn').forEach(element => element.classList.remove('active'));
+    let targetTabButton = document.getElementById('btn-' + tabId);
+    if(targetTabButton) targetTabButton.classList.add('active');
+    if (tabId === 'history-tab' || tabId === 'logs-tab') {
+        renderLogs();
+    }
 }
 
-// Security Checkpoint Operational Management Modals
+// Security Verification Layer Modals Engine
 function openPinModal(title, type, successCallback) {
     document.getElementById('modal-title-text').innerText = title;
     document.getElementById('modal-pin-input').value = '';
@@ -86,152 +154,375 @@ function attemptOpenCustomers() {
     openPinModal("Enter Management Keys to Unlock Configuration Panel", "admin", function() {
         switchView('customers-tab');
         renderCustomerManagement();
+        renderMenuWeightsManagement();
         populateMergeDropdowns();
     });
 }
 
-// NEW INTERACTIVE POS COUNTER VOID LOGIC SYSTEM
-function openPosVoidModal() {
-    document.getElementById('void-token-number-input').value = '';
-    document.getElementById('pos-void-input-modal').style.display = 'flex';
-    document.getElementById('void-token-number-input').focus();
-}
-
-function closePosVoidModal() {
-    document.getElementById('pos-void-input-modal').style.display = 'none';
-}
-
-function submitPosVoidLookup() {
-    let lookupId = parseInt(document.getElementById('void-token-number-input').value.trim());
-    if (isNaN(lookupId)) {
-        alert("Please enter a valid numeric token ID sequence.");
+// POS INTEGRATED HANDSHAKE RETURN DESK LOGIC CORE
+function initiateTokenVoidSequence() {
+    let rawTokenNum = prompt("Please provide Target Token Identification Code (4-Digits):");
+    if (!rawTokenNum) return;
+    
+    let lookupTarget = rawTokenNum.trim().padStart(4, '0');
+    
+    // Scan matching index instances inside Live Register Segment Memory Array
+    let matchIdx = currentDayLog.findIndex(log => log.tokenNumber === lookupTarget);
+    
+    if (matchIdx === -1) {
+        alert(`Token #${lookupTarget} not active within current runtime shift matrix block record traces.`);
         return;
     }
-    
-    // Scan current day shift register array logs trace to lock index position
-    let logIdx = currentDayLog.findIndex(log => log.tokenId === lookupId);
-    if (logIdx === -1) {
-        alert(`Token record assignment reference #${lookupId} not found inside current shift trace buffers.`);
-        return;
-    }
-    
-    activeVoidTargetIndex = logIdx;
-    let targetedRecord = currentDayLog[logIdx];
-    
-    // Close selection screen and render live visual confirm dashboard payload metrics
-    closePosVoidModal();
-    
-    let container = document.getElementById('void-confirmation-details-box');
-    container.innerHTML = `
-        <div class="confirm-row"><span>Token Identifier ID:</span><strong class="pill-token">#${targetedRecord.tokenId}</strong></div>
-        <div class="confirm-row"><span>Log Creation Time:</span><strong>${targetedRecord.time}</strong></div>
-        <div class="confirm-row"><span>Assigned Profile Holder:</span><strong>${targetedRecord.customer}</strong></div>
-        <div class="confirm-row"><span>Target Menu Allocation:</span><strong style="color:var(--primary);">${targetedRecord.item}</strong></div>
-        <div class="confirm-row"><span>Buffered Quantity Multiplier:</span><strong style="font-size:16px; color:var(--danger);">x${targetedRecord.qty}</strong></div>
-    `;
-    
-    document.getElementById('pos-void-confirm-modal').style.display = 'flex';
-}
 
-function closePosVoidConfirmModal() {
-    document.getElementById('pos-void-confirm-modal').style.display = 'none';
-    activeVoidTargetIndex = null;
-}
+    let targetRecord = currentDayLog[matchIdx];
 
-function executeConfirmedPosVoid() {
-    if (activeVoidTargetIndex === null) return;
-    
-    // Route control processing flow parameters directly through supervisor PIN barrier
-    openPinModal("Verification authorization credentials requested.", "refund", function() {
+    // Authorize security layer credentials
+    openPinModal(`Authorize Void Validation Code for Token #${lookupTarget}`, "refund", function() {
+        // Confirm visually directly inside browser overlay UI framework
+        let userConfirmation = confirm(
+            `CONFIRMATION MANIFEST DISPATCH SYSTEM:\n\n` +
+            `• Token Number: ${targetRecord.tokenNumber}\n` +
+            `• Menu Item: ${targetRecord.item}\n` +
+            `• Quantity Segment: x${targetRecord.qty}\n` +
+            `• Profile Account Name: ${targetRecord.customer || 'Walk-In'}\n\n` +
+            `Commit this tracking slice to Terminated Void Structures?`
+        );
+
+        if (!userConfirmation) return;
+
         let now = new Date();
         let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        let matchedTargetItem = currentDayLog[activeVoidTargetIndex];
-        
-        // Construct void object payload data matrix nodes
-        let voidRecordObject = {
-            tokenId: matchedTargetItem.tokenId,
+
+        // Construct Void Trace Log Object Node
+        let refundObject = {
             time: refundTime,
-            item: matchedTargetItem.item,
-            qty: matchedTargetItem.qty,
-            customer: matchedTargetItem.customer || "Walk-In"
+            tokenNumber: targetRecord.tokenNumber,
+            item: targetRecord.item,
+            qty: targetRecord.qty,
+            customer: targetRecord.customer || "Walk-In"
         };
-        
-        // Mutate registries
-        currentRefundLog.push(voidRecordObject);
+
+        // Transfer records across active database states
+        currentRefundLog.push(refundObject);
         localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
-        
-        currentDayLog.splice(activeVoidTargetIndex, 1);
+
+        currentDayLog.splice(matchIdx, 1);
         localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-        
-        closePosVoidConfirmModal();
-        updateLiveBreakdown();
+
+        alert(`Token #${lookupTarget} Void Execution integration sequence completed. No paper printed.`);
         renderLogs();
-        
-        alert(`Data mutation confirmation finalized. Token Instance #${voidRecordObject.tokenId} successfully voided on-screen.`);
     });
 }
 
-// Token Printing Operations Hub (Prints Token Number, No Weight)
-function printTokens() {
-    if (Object.keys(currentCart).length === 0) return;
-    openCustomerModal();
+function attemptOpenConsumption() {
+    openPinModal("Enter Management Keys to Unlock Analytic Engine", "admin", function() {
+        switchView('consumption-tab');
+        populateFilterOptions();
+        populateShiftSelectorOptions();
+        renderConsumptionReport();
+    });
 }
 
-function executeTokenPrinting(customerName) {
-    const printArea = document.getElementById('print-area');
-    printArea.innerHTML = ''; 
-    let now = new Date();
-    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    let dateStr = getFormattedSystemDate(now);
+function handleCustomerSearchFilter() {
+    activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
+    renderCustomerManagement();
+}
 
-    if (!shiftStartTime) {
-        shiftStartTime = timeStr;
-        localStorage.setItem('shiftStartTime', shiftStartTime);
-    }
+function populateMergeDropdowns() {
+    let srcSelect = document.getElementById('merge-source-select');
+    let tgtSelect = document.getElementById('merge-target-select');
+    
+    srcSelect.innerHTML = '<option value="">-- Select Duplicate Profile (To Merge From) --</option>';
+    tgtSelect.innerHTML = '<option value="">-- Select Target Primary Master Profile --</option>';
+    
+    let sortedCustomers = [...knownCustomers].sort();
+    sortedCustomers.forEach(cust => {
+        srcSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+        tgtSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
+    });
+}
 
-    for (let item in currentCart) {
-        let qty = currentCart[item];
-        let currentAssignedTokenId = nextGlobalTokenId++;
-        
-        // Commit newly assigned instances directly into structural live transaction index records
-        currentDayLog.push({ 
-            tokenId: currentAssignedTokenId, 
-            time: timeStr, 
-            item: item, 
-            qty: qty, 
-            customer: customerName 
-        });
-        
-        let token = document.createElement('div');
-        token.className = 'pos-token';
-        token.innerHTML = `
-            <div class="brand-main">AHMED HANIF RAJPUT</div>
-            <div style="font-size: 16px; font-weight: 900; text-align: center; background: #000; color: #fff; padding: 4px 0; margin: 4px 0;">TOKEN ID: #${currentAssignedTokenId}</div>
-            <div class="pos-divider"></div>
-            <div class="item-container">
-                <div class="pos-item">${item}</div>
-                <div class="pos-qty">UNITS COUNT: [ ${qty} ]</div>
-            </div>
-            <div class="pos-divider"></div>
-            <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
-            <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase;">ACCOUNT MAPPING: ${customerName}</div>
-        `;
-        printArea.appendChild(token);
+function renderCustomerManagement() {
+    const listDiv = document.getElementById('customer-management-list');
+    listDiv.innerHTML = '';
+    
+    let filteredCustomers = knownCustomers.filter(cust => 
+        cust.toLowerCase().includes(activeCustomerSearchQuery)
+    );
+
+    if (filteredCustomers.length === 0) {
+        listDiv.innerHTML = '<p style="color:var(--text-muted); padding: 12px 0;">No matching identity profiles found.</p>';
+        return;
     }
     
-    // Save live operational system state tracking arrays permanently to localized storage
+    let table = `<table class="styled-table">
+        <thead>
+            <tr>
+                <th>Account Holder Registry Label</th>
+                <th style="text-align:right; width: 180px;">Actions Control</th>
+            </tr>
+        </thead>
+        <tbody>`;
+        
+    filteredCustomers.forEach((cust) => {
+        let actualIndex = knownCustomers.indexOf(cust);
+        table += `<tr>
+            <td style="font-weight:600; color:var(--text-main);">${cust}</td>
+            <td style="text-align:right;">
+                <button class="btn-action-small btn-edit" onclick="editCustomer(${actualIndex})">Modify</button>
+                <button class="btn-action-small btn-refund" onclick="deleteCustomer(${actualIndex})">Purge</button>
+            </td>
+        </tr>`;
+    });
+    table += `</tbody></table>`;
+    listDiv.innerHTML = table;
+}
+
+function executeCustomerMerge() {
+    let source = document.getElementById('merge-source-select').value;
+    let target = document.getElementById('merge-target-select').value;
+    
+    if(!source || !target) {
+        alert("Please select both a source duplicate profile and a target master profile.");
+        return;
+    }
+    if(source === target) {
+        alert("Cannot merge a profile into itself.");
+        return;
+    }
+    
+    if(!confirm(`Are you absolutely sure you want to merge "${source}" into "${target}"?\nAll history records, shift logs, and analytics data will be combined into "${target}", and "${source}" will be deleted.`)) {
+        return;
+    }
+    
+    currentDayLog.forEach(log => {
+        if(log.customer === source) log.customer = target;
+    });
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-    localStorage.setItem('nextGlobalTokenId', nextGlobalTokenId.toString());
     
-    setTimeout(() => { 
-        window.print(); 
-        currentCart = {}; 
-        renderCart(); 
-        updateLiveBreakdown(); 
-    }, 50);
+    currentRefundLog.forEach(log => {
+        if(log.customer === source) log.customer = target;
+    });
+    localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
+    
+    allTimeHistory.forEach(day => {
+        if (day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => {
+                if (entry.customer === source) entry.customer = target;
+            });
+        }
+    });
+    localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    
+    let srcIdx = knownCustomers.indexOf(source);
+    if(srcIdx > -1) knownCustomers.splice(srcIdx, 1);
+    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+    
+    alert(`Customer Record Integration Successful! "${source}" has been combined into "${target}".`);
+    
+    populateCustomerDatalist();
+    populateMergeDropdowns();
+    renderCustomerManagement();
+    renderLogs();
 }
 
-// POS Desktop Interface Core Component UI Render Engines
+function exportSystemBackupJSON() {
+    let backupPayload = {
+        categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
+        currentDayLog: JSON.parse(localStorage.getItem('currentDayLog')) || currentDayLog,
+        currentRefundLog: JSON.parse(localStorage.getItem('currentRefundLog')) || currentRefundLog,
+        allTimeHistory: JSON.parse(localStorage.getItem('allTimeHistory')) || allTimeHistory,
+        knownCustomers: JSON.parse(localStorage.getItem('knownCustomers')) || knownCustomers,
+        shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime,
+        nextTokenSequence: nextTokenSequence
+    };
+    
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
+    let downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `AHRP_POS_SYSTEM_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+}
+
+function importSystemBackupJSON() {
+    let fileInput = document.getElementById('import-backup-file');
+    if(fileInput.files.length === 0) {
+        alert("Please select a valid (.json) backup database template file first.");
+        return;
+    }
+    
+    if(!confirm("CRITICAL WARNING: This action will completely overwrite all local application data, current shift data, history ledgers, and configurations. Proceed?")) {
+        return;
+    }
+    
+    let selectedFile = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            let parsedData = JSON.parse(event.target.result);
+            
+            if(!parsedData.categorizedMenu || !parsedData.knownCustomers || !parsedData.allTimeHistory) {
+                throw new Error("Invalid schema tracking configuration variables.");
+            }
+            
+            localStorage.setItem('categorizedMenu', JSON.stringify(parsedData.categorizedMenu));
+            localStorage.setItem('currentDayLog', JSON.stringify(parsedData.currentDayLog || []));
+            localStorage.setItem('currentRefundLog', JSON.stringify(parsedData.currentRefundLog || []));
+            localStorage.setItem('allTimeHistory', JSON.stringify(parsedData.allTimeHistory || []));
+            localStorage.setItem('knownCustomers', JSON.stringify(parsedData.knownCustomers || []));
+            if(parsedData.shiftStartTime) {
+                localStorage.setItem('shiftStartTime', parsedData.shiftStartTime);
+            } else {
+                localStorage.removeItem('shiftStartTime');
+            }
+            if(parsedData.nextTokenSequence) {
+                localStorage.setItem('nextTokenSequence', parsedData.nextTokenSequence);
+                nextTokenSequence = parsedData.nextTokenSequence;
+            }
+            
+            customItems = parsedData.categorizedMenu;
+            currentDayLog = parsedData.currentDayLog || [];
+            currentRefundLog = parsedData.currentRefundLog || [];
+            allTimeHistory = parsedData.allTimeHistory || [];
+            knownCustomers = parsedData.knownCustomers || [];
+            shiftStartTime = parsedData.shiftStartTime || null;
+            
+            alert("Database Memory Override Successfully Restored!");
+            location.reload(); 
+            
+        } catch(err) {
+            alert("Error parsing memory file: Invalid JSON backup package schema configuration layout.\n" + err.message);
+        }
+    };
+    reader.readAsText(selectedFile);
+}
+
+function renderMenuWeightsManagement() {
+    const container = document.getElementById('menu-weights-management-container');
+    container.innerHTML = '';
+    let table = `<div class="section-title" style="margin-top:16px; font-weight:800; font-size:12px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Active Dynamic Mass Multiplier Factors</div>
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Menu Item Label</th>
+                <th>Category Mapping</th>
+                <th style="width:120px;">Unit Grams (g)</th>
+                <th style="text-align:right; width:80px;">Execution</th>
+            </tr>
+        </thead>
+        <tbody>`;
+    customItems.forEach((itemObj, index) => {
+        table += `<tr>
+            <td style="font-weight:600; color:var(--text-main);">${itemObj.name}</td>
+            <td style="color:var(--text-muted); font-size:12px;">${itemObj.category}</td>
+            <td>
+                <input type="number" class="input-field" id="weight-input-${index}" value="${itemObj.weight || 0}" style="padding:6px; font-size:13px; text-align:center;">
+            </td>
+            <td style="text-align:right;">
+                <button class="btn-action-small btn-edit" style="background:var(--accent); color:white; border:none;" onclick="updateItemWeightRow(${index})">Bind</button>
+            </td>
+        </tr>`;
+    });
+    table += `</tbody></table>`;
+    container.innerHTML = table;
+}
+
+function updateItemWeightRow(index) {
+    let inputField = document.getElementById(`weight-input-${index}`);
+    let newW = parseInt(inputField.value);
+    if (isNaN(newW) || newW < 0) {
+        alert("Entry out of bounds range parameters.");
+        return;
+    }
+    customItems[index].weight = newW;
+    localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
+    alert(`Retroactive execution mapping successful. Item weight altered to ${newW}g.`);
+    renderMenu();
+    updateLiveBreakdown();
+}
+
+function addCustomerManually() {
+    let input = document.getElementById('new-manual-customer');
+    let name = input.value.trim().replace(/\b\w/g, char => char.toUpperCase());
+    if (!name) return;
+    if (!knownCustomers.includes(name)) {
+        knownCustomers.push(name);
+        localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+        populateCustomerDatalist();
+        populateMergeDropdowns();
+        renderCustomerManagement();
+        input.value = '';
+    } else {
+        alert("Account key already exists.");
+    }
+}
+
+function editCustomer(index) {
+    let oldName = knownCustomers[index];
+    let newName = prompt("Alter tracked profile allocation header string:", oldName);
+    if (!newName || newName.trim() === "" || newName.trim() === oldName) return;
+    let formattedName = newName.trim().replace(/\b\w/g, char => char.toUpperCase());
+    if (knownCustomers.includes(formattedName) && formattedName !== oldName) {
+        alert("Target token value collision identifier detected.");
+        return;
+    }
+    knownCustomers[index] = formattedName;
+    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+    currentDayLog.forEach(log => { if (log.customer === oldName) log.customer = formattedName; });
+    localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+    allTimeHistory.forEach(day => {
+        if (day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => { if (entry.customer === oldName) entry.customer = formattedName; });
+        }
+    });
+    localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    populateCustomerDatalist();
+    populateMergeDropdowns();
+    renderCustomerManagement();
+    renderLogs();
+}
+
+function deleteCustomer(index) {
+    let targetName = knownCustomers[index];
+    if (confirm(`Wipe "${targetName}" identity mapping block trace completely?`)) {
+        knownCustomers.splice(index, 1);
+        localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+        populateCustomerDatalist();
+        populateMergeDropdowns();
+        renderCustomerManagement();
+    }
+}
+
+function openCustomerModal() {
+    document.getElementById('cust-modal-name-input').value = '';
+    document.getElementById('customer-name-modal').style.display = 'flex';
+    document.getElementById('cust-modal-name-input').focus();
+}
+
+function closeCustomerModal() { document.getElementById('customer-name-modal').style.display = 'none'; }
+
+function submitCustomerModal() {
+    let rawName = document.getElementById('cust-modal-name-input').value.trim();
+    if (rawName === "") {
+        alert("Valid identification matrix required.");
+        return;
+    }
+    let finalName = "";
+    let matchedName = findClosestCustomerName(rawName);
+    if (matchedName) {
+        finalName = matchedName;
+    } else {
+        finalName = rawName.replace(/\b\w/g, char => char.toUpperCase());
+        knownCustomers.push(finalName);
+        localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+        populateCustomerDatalist(); 
+    }
+    closeCustomerModal();
+    executeTokenPrinting(finalName); 
+}
+
 function renderCategoryFilters() {
     const container = document.getElementById('category-filter-container');
     container.innerHTML = '';
@@ -254,42 +545,16 @@ function getItemCategory(itemName) {
     return found ? found.category : "Others";
 }
 
+// Fixed function to completely bypass structural system errors
 function getItemWeight(itemName) {
     let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
     return found && found.weight ? parseFloat(found.weight) : 0;
 }
 
-// Levenshtein Logic Engine (For Identity Selection Auto-matching)
-function getLevenshteinDistance(a, b) {
-    if (a.length === 0) return b.length; if (b.length === 0) return a.length;
-    const matrix = [];
-    for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
-    for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
-    for (let i = 1; i <= b.length; i++) {
-        for (let j = 1; j <= a.length; j++) {
-            if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
-            else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
-        }
-    }
-    return matrix[b.length][a.length];
-}
-
-function findClosestCustomerName(inputName) {
-    let cleanInput = inputName.trim().toLowerCase();
-    let bestMatch = null; let lowestDistance = Infinity;
-    for (let known of knownCustomers) {
-        let cleanKnown = known.toLowerCase();
-        let distance = getLevenshteinDistance(cleanInput, cleanKnown);
-        let threshold = cleanInput.length <= 4 ? 1 : 2; 
-        if (distance <= threshold && distance < lowestDistance) { lowestDistance = distance; bestMatch = known; }
-    }
-    return bestMatch;
-}
-
 function renderMenu() {
     const grid = document.getElementById('items-grid');
     grid.innerHTML = '';
-    customItems.forEach((itemObj) => {
+    customItems.forEach((itemObj, index) => {
         if (currentActiveCategory !== "All" && itemObj.category !== currentActiveCategory) return;
         let card = document.createElement('div');
         card.className = 'menu-card';
@@ -299,11 +564,27 @@ function renderMenu() {
     });
 }
 
+function addNewItem() {
+    const nameInput = document.getElementById('new-item-name');
+    const catSelect = document.getElementById('new-item-category');
+    const weightInput = document.getElementById('new-item-weight');
+    const name = nameInput.value.trim();
+    const weight = parseInt(weightInput.value) || 0;
+    if(!name) return;
+    customItems.push({ name: name, category: catSelect.value, weight: weight });
+    localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
+    nameInput.value = '';
+    weightInput.value = '';
+    alert(`Successfully mapped item allocation array schema instance.`);
+    renderMenu();
+    renderMenuWeightsManagement();
+}
+
 function renderCart() {
     const container = document.getElementById('cart-container');
     container.innerHTML = '';
     if (Object.keys(currentCart).length === 0) {
-        container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding-top:45px; margin:0; font-size: 13px;">Queue Array Buffer Empty</p>';
+        container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding-top:45px; margin:0; font-size: 13px;">Queue Array Buffer Allocation Empty</p>';
         return;
     }
     for (let item in currentCart) {
@@ -322,6 +603,7 @@ function renderCart() {
 }
 
 function addToCart(item) { currentCart[item] = (currentCart[item] || 0) + 1; renderCart(); }
+
 function changeQty(item, amount) { 
     currentCart[item] += amount; 
     if (currentCart[item] <= 0) delete currentCart[item]; 
@@ -378,68 +660,61 @@ function updateLiveBreakdown() {
     container.innerHTML = html;
 }
 
-// LOGS RENDERING HUB (Shows precise details including generated Token Number ID keys)
+// RENDER STREAM LOGS SHIFT VIEWS (Now featuring token validation keys)
 function renderLogs() {
     const logBody = document.getElementById('live-log');
     logBody.innerHTML = '';
-    if(currentDayLog.length === 0){ 
-        logBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No item array stream signals captured.</td></tr>`; 
-    }
+    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No active sale signals traced.</td></tr>`; }
     
     for(let i = currentDayLog.length - 1; i >= 0; i--) {
         let log = currentDayLog[i];
+        let displayToken = log.tokenNumber || "N/A";
         let row = `<tr>
-            <td><span class="pill-token">#${log.tokenId || 'N/A'}</span></td>
             <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
+            <td style="font-family:monospace; font-weight:700; color:var(--accent);">#${displayToken}</td>
             <td style="font-weight:700; color:var(--primary);">${log.customer || 'Walk-In'}</td>
             <td style="font-weight:600; color:var(--text-main);">${log.item}</td>
-            <td style="font-weight:700;">x${log.qty}</td>
+            <td style="text-align:right; font-weight:700; color:var(--primary);">x${log.qty}</td>
         </tr>`;
         logBody.insertAdjacentHTML('beforeend', row);
     }
 
     const refundBody = document.getElementById('refund-log');
     refundBody.innerHTML = '';
-    if(currentRefundLog.length === 0) { 
-        refundBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generated.</td></tr>`; 
-    }
+    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No void history signals traced.</td></tr>`; }
     
     for(let j = currentRefundLog.length - 1; j >= 0; j--) {
         let rLog = currentRefundLog[j];
+        let displayToken = rLog.tokenNumber || "N/A";
         let row = `<tr>
-            <td><span class="pill-void">#${rLog.tokenId || 'N/A'}</span></td>
             <td style="color:var(--danger); font-weight:500;">${rLog.time}</td>
-            <td style="font-weight:700; color:var(--text-muted); text-decoration:line-through;">${rLog.customer || 'Walk-In'}</td>
+            <td style="font-family:monospace; font-weight:700; color:var(--text-muted);">#${displayToken}</td>
+            <td style="color:var(--text-muted); text-decoration: line-through;">${rLog.customer || 'Walk-In'}</td>
             <td style="font-weight:600; color:var(--text-muted); text-decoration: line-through;">${rLog.item}</td>
-            <td style="font-weight:700; color:var(--danger);">x${rLog.qty}</td>
+            <td style="text-align:right; font-weight:700; color:var(--danger); text-decoration: line-through;">x${rLog.qty}</td>
         </tr>`;
         refundBody.insertAdjacentHTML('beforeend', row);
     }
 
     updateLiveBreakdown();
-    renderVaultLedgerCards();
-}
 
-function renderVaultLedgerCards() {
     const histContainer = document.getElementById('history-container');
     histContainer.innerHTML = '';
-    if(allTimeHistory.length === 0) { 
-        histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger history index empty array structure.</p>'; 
-    }
+    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger archive is empty.</p>'; }
     
     allTimeHistory.forEach((day, index) => {
         let normalizedDateLabel = normalizeToSystemDate(day.date);
         let rangeSuffix = (day.startTime && day.endTime) ? ` (${day.startTime} to ${day.endTime})` : '';
 
-        let html = `<div class="history-card" style="background:#fff; border:1px solid var(--border); padding:16px; border-radius:var(--radius); box-shadow:var(--shadow); position:relative; margin-bottom:16px;">
-            <button style="position:absolute; top:12px; right:12px; background:none; border:none; color:var(--danger); font-size:18px; font-weight:900; cursor:pointer;" onclick="deleteHistoryItem(${index})">×</button>
-            <div class="history-header" style="margin-bottom:8px;">
-                <span style="font-size:14px; font-weight:700;">Date: <strong>${normalizedDateLabel}</strong></span><br>
-                <span style="color:var(--primary); font-size:11px;">Timeline: <strong>${rangeSuffix || 'N/A'}</strong></span>
+        let html = `<div class="history-card">
+            <button class="delete-history-btn" onclick="deleteHistoryItem(${index})">×</button>
+            <div class="history-header">
+                <span>Date Scope Trace: <strong>${normalizedDateLabel}</strong></span>
+                <span style="color:var(--primary); font-size:11px;">Timeline Boundary: <strong>${rangeSuffix || 'N/A'}</strong></span>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:11px; color:var(--text-muted);">
                 <span>Gross: ${day.grossItems || day.totalItems} | Voided: ${day.refundedItems || 0}</span>
-                <span style="color:var(--accent); font-weight:bold;">Net: ${day.totalItems}</span>
+                <span style="color:var(--accent); font-weight:bold;">Net Operational Sum: ${day.totalItems}</span>
             </div>
             <table style="width:100%; font-size:13px; color:#475569;">`;
         
@@ -458,158 +733,389 @@ function renderVaultLedgerCards() {
             }
         });
         html += `</table>`;
+        
+        if (day.detailedTimeline && day.detailedTimeline.length > 0) {
+            html += `<div style="font-weight:700; font-size:11px; margin-top:12px; color:var(--text-muted); text-transform:uppercase; border-top: 1px dashed var(--border); padding-top: 8px;">Chronological Action Log Flow</div><div class="timeline-box">`;
+            day.detailedTimeline.forEach(t => {
+                let styleRule = t.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-main);';
+                let nameSuffix = t.customer ? ` (${t.customer})` : '';
+                let tNumDisplay = t.tokenNumber ? ` [#${t.tokenNumber}]` : '';
+                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}]${tNumDisplay} ${t.type}: ${t.item}${nameSuffix} x${t.qty}</div>`;
+            });
+            html += `</div>`;
+        }
+        html += `<button class="print-report-btn" onclick="printSummaryReport(${index})">Generate Thermal Report</button></div>`;
         histContainer.insertAdjacentHTML('afterbegin', html);
     });
 }
 
-// User Configuration Panels Rendering Rules
-function populateCustomerDatalist() {
-    const dataList = document.getElementById('customer-memory-list');
-    if(!dataList) return; dataList.innerHTML = '';
-    knownCustomers.sort().forEach(name => {
-        let option = document.createElement('option'); option.value = name; dataList.appendChild(option);
+function printSummaryReport(index) {
+    const day = allTimeHistory[index];
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+    let topItem = "None"; let maxQty = 0;
+    for (let itm in day.summary) { if (day.summary[itm] > maxQty) { maxQty = day.summary[itm]; topItem = itm; } }
+    let reportDiv = document.createElement('div');
+    reportDiv.className = 'pos-report';
+    let itemsHtml = '';
+    let categoryOrder = ["Rice", "Curry", "Bread", "Others"];
+    categoryOrder.forEach(cat => {
+        let catHeaderPrinted = false;
+        for (let itm in day.summary) {
+            if (getItemCategory(itm) === cat) {
+                if (!catHeaderPrinted) {
+                    itemsHtml += `<div class="report-category-header">${cat}</div>`;
+                    catHeaderPrinted = true;
+                }
+                let wStr = ((day.summary[itm] * getItemWeight(itm)) / 1000).toFixed(2);
+                itemsHtml += `<div class="report-row"><span>&nbsp;&nbsp;${itm.toUpperCase()}</span><span>x${day.summary[itm]} (${wStr} KG)</span></div>`;
+            }
+        }
     });
+    let timeRangeTitle = (day.startTime && day.endTime) ? `${day.startTime} TO ${day.endTime}` : 'SHIFT REPORT';
+    reportDiv.innerHTML = `
+        <div class="brand-main">AHMED HANIF RAJPUT</div>
+        <div class="report-title">SHIFT ANALYSIS METRICS</div>
+        <div class="meta-line">DATE: ${normalizeToSystemDate(day.date)}</div>
+        <div class="meta-line">SHIFT BLOCK: ${timeRangeTitle}</div>
+        <div class="pos-divider"></div>
+        <div class="report-row"><span>GROSS EMITTED:</span><span>${day.grossItems || day.totalItems} Units</span></div>
+        <div class="report-row"><span>VOIDED EXECUTIONS:</span><span>${day.refundedItems || 0} Units</span></div>
+        <div class="report-row" style="border-top:2px solid #000000 !important; padding-top:4px;"><span>NET INVENTORY TOTAL:</span><span>${day.totalItems} Units</span></div>
+        <div class="pos-divider-thin"></div>
+        <div style="font-size:11px; font-weight:900; margin-bottom:4px; text-align:center; text-transform:uppercase;">Dynamic Net Mass Quantization</div>
+        ${itemsHtml}
+        <div class="pos-divider-thin" style="margin-top:6px;"></div>
+        <div class="highlight-box">
+            <div style="font-size: 11px; font-weight: 900;">MAX ACCUMULATED VOLUME</div>
+            <div style="font-size: 18px; font-weight: 900; text-transform: uppercase; margin: 2px 0;">${topItem}</div>
+            <div style="font-size: 12px; font-weight: 900;">Units count: ${maxQty}</div>
+        </div>
+        <div class="pos-divider"></div>
+    `;
+    printArea.appendChild(reportDiv);
+    setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
 }
 
-function populateMergeDropdowns() {
-    let srcSelect = document.getElementById('merge-source-select');
-    let tgtSelect = document.getElementById('merge-target-select');
-    if(!srcSelect || !tgtSelect) return;
-    srcSelect.innerHTML = '<option value="">-- Merge From (Duplicate Profile) --</option>';
-    tgtSelect.innerHTML = '<option value="">-- Merge To (Primary Master Profile) --</option>';
-    let sortedCustomers = [...knownCustomers].sort();
-    sortedCustomers.forEach(cust => {
-        srcSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
-        tgtSelect.innerHTML += `<option value="${cust}">${cust}</option>`;
-    });
+function printTokens() {
+    if (Object.keys(currentCart).length === 0) return;
+    openCustomerModal();
 }
 
-function renderCustomerManagement() {
-    const listDiv = document.getElementById('customer-management-list');
-    if(!listDiv) return; listDiv.innerHTML = '';
-    let filteredCustomers = knownCustomers.filter(cust => cust.toLowerCase().includes(activeCustomerSearchQuery));
-    if (filteredCustomers.length === 0) {
-        listDiv.innerHTML = '<p style="color:var(--text-muted); padding: 12px 0;">No matching identity profiles found.</p>'; return;
+// PRINTING TOKENS WITH UNIQUE INJECTED SERIAL CODE (Weight string display fully stripped)
+function executeTokenPrinting(customerName) {
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = ''; 
+    let now = new Date();
+    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let dateStr = getFormattedSystemDate(now);
+
+    if (!shiftStartTime) {
+        shiftStartTime = timeStr;
+        localStorage.setItem('shiftStartTime', shiftStartTime);
     }
-    let table = `<table class="styled-table"><thead><tr><th>Account Name Label</th><th style="text-align:right; width:90px;">Control</th></tr></thead><tbody>`;
-    filteredCustomers.forEach((cust) => {
-        let actualIndex = knownCustomers.indexOf(cust);
-        table += `<tr><td style="font-weight:600;">${cust}</td><td style="text-align:right;"><button class="btn-danger-outline" style="padding:4px 8px; font-size:11px;" onclick="deleteCustomer(${actualIndex})">Purge</button></td></tr>`;
-    });
-    table += `</tbody></table>`; listDiv.innerHTML = table;
-}
 
-function executeCustomerMerge() {
-    let source = document.getElementById('merge-source-select').value;
-    let target = document.getElementById('merge-target-select').value;
-    if(!source || !target || source === target) return alert("Select distinct source/target profiles.");
-    if(!confirm(`Merge "${source}" cleanly into "${target}"?`)) return;
-    currentDayLog.forEach(log => { if(log.customer === source) log.customer = target; });
-    currentRefundLog.forEach(log => { if(log.customer === source) log.customer = target; });
-    let srcIdx = knownCustomers.indexOf(source); if(srcIdx > -1) knownCustomers.splice(srcIdx, 1);
+    for (let item in currentCart) {
+        let qty = currentCart[item];
+        let tokenNum = generateRollingTokenNumber(); // Dynamic numerical tracking anchor
+
+        // Commit tracking record instance directly to log matrix arrays
+        currentDayLog.push({ 
+            time: timeStr, 
+            tokenNumber: tokenNum, 
+            item: item, 
+            qty: qty, 
+            customer: customerName 
+        });
+
+        let token = document.createElement('div');
+        token.className = 'pos-token';
+        
+        token.innerHTML = `
+            <div class="brand-main">AHMED HANIF RAJPUT</div>
+            <div style="font-size: 15px; font-weight: 900; text-align: center; color: #ffffff !important; background-color: #000000 !important; padding: 3px 0; margin: 4px 0;">TOKEN ID: #${tokenNum}</div>
+            <div class="pos-divider"></div>
+            <div class="item-container">
+                <div class="pos-item">${item}</div>
+                <div class="pos-qty">UNITS COUNT: [ ${qty} ]</div>
+            </div>
+            <div class="pos-divider"></div>
+            <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
+            <div style="font-size:12px; font-weight:900; margin-top:5px; text-transform:uppercase;">ACCOUNT: ${customerName}</div>
+        `;
+        printArea.appendChild(token);
+    }
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-    localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
-    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-    populateCustomerDatalist(); populateMergeDropdowns(); renderCustomerManagement(); renderLogs();
-}
-
-function addCustomerManually() {
-    let input = document.getElementById('new-manual-customer');
-    let name = input.value.trim().replace(/\b\w/g, char => char.toUpperCase());
-    if (!name) return;
-    if (!knownCustomers.includes(name)) {
-        knownCustomers.push(name); localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-        populateCustomerDatalist(); populateMergeDropdowns(); renderCustomerManagement(); input.value = '';
-    }
-}
-
-function deleteCustomer(index) {
-    if (confirm(`Wipe identity mapping block trace?`)) {
-        knownCustomers.splice(index, 1); localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-        populateCustomerDatalist(); populateMergeDropdowns(); renderCustomerManagement();
-    }
-}
-
-function handleCustomerSearchFilter() {
-    activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
-    renderCustomerManagement();
-}
-
-function openCustomerModal() {
-    document.getElementById('cust-modal-name-input').value = '';
-    document.getElementById('customer-name-modal').style.display = 'flex';
-    document.getElementById('cust-modal-name-input').focus();
-}
-function closeCustomerModal() { document.getElementById('customer-name-modal').style.display = 'none'; }
-
-function submitCustomerModal() {
-    let rawName = document.getElementById('cust-modal-name-input').value.trim();
-    if (rawName === "") return alert("Valid identity label required.");
-    let finalName = ""; let matchedName = findClosestCustomerName(rawName);
-    if (matchedName) finalName = matchedName;
-    else {
-        finalName = rawName.replace(/\b\w/g, char => char.toUpperCase());
-        knownCustomers.push(finalName); localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-        populateCustomerDatalist();
-    }
-    closeCustomerModal(); executeTokenPrinting(finalName);
+    setTimeout(() => { window.print(); currentCart = {}; renderCart(); renderLogs(); }, 50);
 }
 
 function deleteHistoryItem(index) {
     if (!confirm("Permanently drop selected ledger sequence index container?")) return;
-    openPinModal("Management validation rules active.", "admin", function() {
-        allTimeHistory.splice(index, 1); localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    openPinModal("Management authentication validation parameters active.", "admin", function() {
+        allTimeHistory.splice(index, 1);
+        localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
         renderLogs();
     });
 }
 
 function clearAllHistory() {
-    if (!confirm("Purge entire core relational historical index architecture? Action terminal.")) return;
+    if (!confirm("Purge entire core relational historical index architecture? Warning: Action is terminal.")) return;
     openPinModal("Administrative security credentials requested.", "admin", function() {
-        allTimeHistory = []; localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+        allTimeHistory = [];
+        localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
         renderLogs();
     });
 }
 
 function attemptStartNewDay() {
     openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
-        currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
-        localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-        currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
+        startNewDay();
         alert("New operational tracking register open.");
     });
 }
 
+function startNewDay() {
+    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
+    localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
+    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
+}
+
 function endDay() {
-    if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state registry empty.");
-    if (!confirm("Terminate current runtime cycle shift datasets?")) return;
-    openPinModal("Administrative checkpoint logic keys verified.", "admin", function() {
-        let netItems = 0; let grossItemsCount = 0; let summary = {};
+    if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state queue registry matrices isolated as null.");
+    if (!confirm("Terminate current operational runtime cycle window parameters and shift dataset structures?")) return;
+    openPinModal("Administrative security checkpoint logic verified execution keys.", "admin", function() {
+        let netItems = 0; let grossItemsCount = 0; let summary = {}; let detailedTimeline = [];
+
         currentDayLog.forEach(log => { 
             netItems += log.qty; grossItemsCount += log.qty;
             summary[log.item] = (summary[log.item] || 0) + log.qty; 
+            detailedTimeline.push({time: log.time, tokenNumber: log.tokenNumber, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer});
         });
-        let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        let shiftOpeningTime = shiftStartTime || shiftClosingTime;
+        currentRefundLog.forEach(log => {
+            grossItemsCount += log.qty;
+            detailedTimeline.push({time: log.time, tokenNumber: log.tokenNumber, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In"});
+        });
         
-        allTimeHistory.push({ 
-            date: getFormattedSystemDate(), startTime: shiftOpeningTime, endTime: shiftClosingTime,
-            totalItems: netItems, grossItems: grossItemsCount, refundedItems: currentRefundLog.length, summary: summary
-        });
+        detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
+        
+        let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
+        let shiftClosingTimestamp = getFormattedSystemDate();
+        
+        let dayRecord = { 
+            date: shiftClosingTimestamp, 
+            startTime: shiftOpeningTime,
+            endTime: shiftClosingTime,
+            totalItems: netItems, 
+            grossItems: grossItemsCount,
+            refundedItems: currentRefundLog.length, 
+            summary: summary, 
+            detailedTimeline: detailedTimeline
+        };
+        allTimeHistory.push(dayRecord);
         localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
         
         currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
         localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-        renderLogs(); switchView('history-tab');
+        
+        renderLogs();
+        switchView('history-tab');
     });
 }
 
-// Global Modal Input Keyboard Event Hook Key Listener Hooks
+function getAllConsumptionData() {
+    let rows = [];
+    let liveLabel = getFormattedSystemDate();
+    currentDayLog.forEach(l => {
+        rows.push({ date: liveLabel, shiftId: "LIVE", tokenNumber: l.tokenNumber, time: l.time, customer: l.customer || "Walk-In", item: l.item, qty: l.qty, type: "SALE" });
+    });
+    currentRefundLog.forEach(r => {
+        rows.push({ date: liveLabel, shiftId: "LIVE", tokenNumber: r.tokenNumber, time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: "REFUND" });
+    });
+    allTimeHistory.forEach((day, idx) => {
+        if (day.detailedTimeline) {
+            day.detailedTimeline.forEach(t => {
+                let rangeStr = (day.startTime && day.endTime) ? ` [${day.startTime}-${day.endTime}]` : '';
+                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, tokenNumber: t.tokenNumber || "N/A", time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type });
+            });
+        }
+    });
+    return rows;
+}
+
+function populateFilterOptions() {
+    let data = getAllConsumptionData();
+    let customers = new Set(); let items = new Set(); let dates = new Set();
+    data.forEach(r => {
+        if(r.customer) customers.add(r.customer);
+        if(r.item) items.add(r.item);
+        if(r.date) dates.add(r.date);
+    });
+    let custSel = document.getElementById('filter-cust');
+    let itemSel = document.getElementById('filter-item');
+    let dateSel = document.getElementById('filter-date');
+    custSel.innerHTML = '<option value="ALL">-- All Registry Profiles --</option>';
+    itemSel.innerHTML = '<option value="ALL">-- All Menu Labels --</option>';
+    dateSel.innerHTML = '<option value="ALL">-- All Epoch Shifts --</option>';
+    customers.forEach(c => custSel.innerHTML += `<option value="${c}">${c}</option>`);
+    items.forEach(i => itemSel.innerHTML += `<option value="${i}">${i}</option>`);
+    dates.forEach(d => dateSel.innerHTML += `<option value="${d}">${d}</option>`);
+}
+
+function populateShiftSelectorOptions() {
+    let selector = document.getElementById('rule-shift-selector');
+    let currentSelection = selector.value;
+    
+    let liveRange = shiftStartTime ? ` (Opened: ${shiftStartTime})` : ' (Matrix structural space null)';
+    selector.innerHTML = `<option value="LIVE">Active Operational Runtime Engine Segment${liveRange}</option>`;
+    
+    allTimeHistory.forEach((day, idx) => {
+        let label = normalizeToSystemDate(day.date);
+        let timeStr = (day.startTime && day.endTime) ? ` (${day.startTime} to ${day.endTime})` : '';
+        selector.innerHTML += `<option value="SHIFT-${idx}">Ledger Segment: ${label}${timeStr}</option>`;
+    });
+
+    if (currentSelection && selector.querySelector(`option[value="${currentSelection}"]`)) {
+        selector.value = currentSelection;
+    } else {
+        selector.value = "LIVE";
+    }
+}
+
+function calculateHighConsumptionMatrix(data) {
+    let selectedShift = document.getElementById('rule-shift-selector').value;
+
+    let riceVal = document.getElementById('rule-rice-limit').value.trim();
+    let curryVal = document.getElementById('rule-curry-limit').value.trim();
+    let breadVal = document.getElementById('rule-bread-limit').value.trim();
+
+    let riceLimit = riceVal !== "" ? parseInt(riceVal) : null;
+    let curryLimit = curryVal !== "" ? parseInt(curryVal) : null;
+    let breadLimit = breadVal !== "" ? parseInt(breadVal) : null;
+
+    let aggregation = {};
+    
+    data.forEach(r => {
+        if (r.shiftId !== selectedShift) return;
+        if (r.type !== 'SALE' || r.customer === 'Walk-In') return;
+        
+        let cat = getItemCategory(r.item);
+        let key = `${r.customer}||${r.item}||${cat}`;
+        aggregation[key] = (aggregation[key] || 0) + r.qty;
+    });
+    
+    let tbody = document.getElementById('high-consumption-tbody');
+    tbody.innerHTML = '';
+    let anomaliesFound = false;
+
+    for (let key in aggregation) {
+        let [customer, item, category] = key.split('||');
+        let totalQty = aggregation[key];
+        let shouldFlag = false; 
+        let alertMsg = "";
+        let calculatedW = ((totalQty * getItemWeight(item)) / 1000).toFixed(2);
+
+        if (category === "Rice" && riceLimit !== null && totalQty >= riceLimit) {
+            shouldFlag = true;
+            alertMsg = `Rice Limit Breach Alert (≥ ${riceLimit} Units)`;
+        } else if (category === "Curry" && curryLimit !== null && totalQty >= curryLimit) {
+            shouldFlag = true;
+            alertMsg = `Curry Threshold Flagged Trigger (≥ ${curryLimit} Orders)`;
+        } else if (category === "Bread" && breadLimit !== null && totalQty >= breadLimit) {
+            shouldFlag = true;
+            alertMsg = `Bulk Unit Bread Overflow Logic (≥ ${breadLimit} Pieces)`;
+        }
+        
+        if (shouldFlag) {
+            anomaliesFound = true;
+            let tr = `<tr>
+                <td style="font-weight:700; color:var(--text-main);">${customer}</td>
+                <td>${item}</td>
+                <td style="font-weight:600; color:var(--primary);">${category}</td>
+                <td style="text-align:right; font-weight:800; color:var(--danger);">x${totalQty}</td>
+                <td style="text-align:right; font-weight:800;">${calculatedW} KG</td>
+                <td><span class="flag-pill flag-high">⚠️ ${alertMsg}</span></td>
+            </tr>`;
+            tbody.insertAdjacentHTML('beforeend', tr);
+        }
+    }
+    if (!anomaliesFound) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:16px; font-size:13px;">No critical boundary tracking triggers flagged. System context baseline stable.</td></tr>`;
+    }
+}
+
+function renderConsumptionReport() {
+    let data = getAllConsumptionData();
+    calculateHighConsumptionMatrix(data);
+    let fCust = document.getElementById('filter-cust').value;
+    let fItem = document.getElementById('filter-item').value;
+    let fDate = document.getElementById('filter-date').value;
+    let tbody = document.getElementById('consumption-report-tbody');
+    tbody.innerHTML = '';
+
+    let filtered = data.filter(r => {
+        if (fCust !== "ALL" && r.customer !== fCust) return false;
+        if (fItem !== "ALL" && r.item !== fItem) return false;
+        if (fDate !== "ALL" && r.date !== fDate) return false;
+        return true;
+    });
+    if(filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No ledger entries matched filter constraint attributes.</td></tr>`;
+        return;
+    }
+    filtered.forEach(r => {
+        let statusStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; background:#fee2e2; padding:4px 8px; border-radius:4px;' : 'color:var(--accent); font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:4px;';
+        let qtyStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; text-align:right;' : 'font-weight:700; text-align:right;';
+        let displayQty = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
+        let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
+        let displayWeight = r.type === 'REFUND' ? `-${calcWeightKg}` : calcWeightKg;
+        let tNumDisplay = r.tokenNumber ? ` [#${r.tokenNumber}]` : '';
+        let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}${tNumDisplay}`;
+
+        let tr = `<tr>
+            <td style="font-weight: 500; color: var(--text-muted);">${dateTimeDisplay}</td>
+            <td style="font-weight:600;">${r.customer}</td>
+            <td>${r.item}</td>
+            <td style="${qtyStyle}">${displayQty}</td>
+            <td style="text-align:right; font-weight:600;">${displayWeight} KG</td>
+            <td><span style="${statusStyle}">${r.type}</span></td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', tr);
+    });
+}
+
+function clearConsumptionFilters() {
+    document.getElementById('filter-cust').value = "ALL";
+    document.getElementById('filter-item').value = "ALL";
+    document.getElementById('filter-date').value = "ALL";
+    renderConsumptionReport();
+}
+
+function exportConsumptionToCSV() {
+    let data = getAllConsumptionData();
+    if(data.length === 0) return alert("Structural target storage layer empty.");
+    let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Token Number,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
+    data.forEach(r => {
+        let val = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
+        let wVal = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
+        let wStr = r.type === 'REFUND' ? `-${wVal}` : wVal;
+        csvContent += `"${r.date}, ${r.time || 'N/A'}","${r.tokenNumber || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
+    });
+    let encodedUri = encodeURI(csvContent);
+    let link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Shift_Matrix_Report_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Operational DOM Global Event Key Bindings UI Hooks
 document.getElementById('modal-pin-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitPinModal(); });
 document.getElementById('cust-modal-name-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitCustomerModal(); });
-document.getElementById('void-token-number-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitPosVoidLookup(); });
+document.getElementById('new-manual-customer').addEventListener('keypress', function(e) { if (e.key === 'Enter') addCustomerManually(); });
 
-// Application Bootup Trigger Execution
+// Bootstrap Initial Startup Sequence Loop Trigger
 renderCategoryFilters();
 renderMenu();
 renderLogs();
