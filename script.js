@@ -126,7 +126,7 @@ function closePinModal() {
 
 function submitPinModal() {
     let enteredPin = document.getElementById('modal-pin-input').value.trim();
-    let targetPin = (requiredPinType === 'refund') ? '1414' : '787898';
+    let targetPin = (requiredPinType === 'refund') ? '1414' : 'smoekys444';
     if (enteredPin === targetPin) {
         document.getElementById('secure-pin-modal').style.display = 'none';
         if (activeCallback) activeCallback();
