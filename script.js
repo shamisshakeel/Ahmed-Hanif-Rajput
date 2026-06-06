@@ -842,7 +842,7 @@ function printSummaryReport(index) {
         <div class="highlight-box">
             <div style="font-size: 11px; font-weight: 900;">MAX ACCUMULATED VOLUME</div>
             <div style="font-size: 18px; font-weight: 900; text-transform: uppercase; margin: 2px 0;">${topItem}</div>
-            <div style="font-size: 8px; font-weight: 900;">Quantity: ${maxQty}</div>
+            <div style="font-size: 12px; font-weight: 900;">Units count: ${maxQty}</div>
         </div>
         <div class="pos-divider"></div>
     `;
