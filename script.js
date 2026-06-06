@@ -122,7 +122,6 @@ function openPinModal(title, type, successCallback) {
     document.getElementById('modal-pin-input').focus();
 }
 
-// Global placeholder for audit logs to maintain setup consistency
 function logAuditEvent(type, description) {
     console.log(`[AUDIT LOG] ${type}: ${description}`);
 }
@@ -169,13 +168,11 @@ function attemptOpenAudit() {
     });
 }
 
-// Identity Registry Profile Controls & Dynamic Search
 function handleCustomerSearchFilter() {
     activeCustomerSearchQuery = document.getElementById('customer-search-input').value.trim().toLowerCase();
     renderCustomerManagement();
 }
 
-// Customer Profile Merging Core Logic
 function populateMergeDropdowns() {
     let srcSelect = document.getElementById('merge-source-select');
     let tgtSelect = document.getElementById('merge-target-select');
@@ -274,7 +271,6 @@ function executeCustomerMerge() {
     renderLogs();
 }
 
-// System Backup and Data Restoration System
 function exportSystemBackupJSON() {
     let backupPayload = {
         categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
@@ -392,7 +388,6 @@ function updateItemWeightRow(index) {
     updateLiveBreakdown();
 }
 
-// Customers Layer Manual Actions
 function addCustomerManually() {
     let input = document.getElementById('new-manual-customer');
     let name = input.value.trim().replace(/\b\w/g, char => char.toUpperCase());
@@ -411,23 +406,34 @@ function addCustomerManually() {
 
 function editCustomer(index) {
     let oldName = knownCustomers[index];
-    let newName = prompt("Alter tracked profile allocation header string:", oldName);
-    if (!newName || newName.trim() === "" || newName.trim() === oldName) return;
-    let formattedName = newName.trim().replace(/\b\w/g, char => char.toUpperCase());
-    if (knownCustomers.includes(formattedName) && formattedName !== oldName) {
-        alert("Target token value collision identifier detected.");
+    let newName = prompt("Modify Identity Mapping Label Registration:", oldName);
+    if (newName === null) return;
+    newName = newName.trim().replace(/\b\w/g, char => char.toUpperCase());
+    if (!newName) return;
+    if (newName === oldName) return;
+    
+    if (knownCustomers.includes(newName)) {
+        alert("Target identity configuration already active.");
         return;
     }
-    knownCustomers[index] = formattedName;
-    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-    currentDayLog.forEach(log => { if (log.customer === oldName) log.customer = formattedName; });
+    
+    currentDayLog.forEach(log => { if(log.customer === oldName) log.customer = newName; });
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+    
+    currentRefundLog.forEach(log => { if(log.customer === oldName) log.customer = newName; });
+    localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
+    
     allTimeHistory.forEach(day => {
-        if (day.detailedTimeline) {
-            day.detailedTimeline.forEach(entry => { if (entry.customer === oldName) entry.customer = formattedName; });
+        if(day.detailedTimeline) {
+            day.detailedTimeline.forEach(e => { if(e.customer === oldName) e.customer = newName; });
         }
     });
     localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    
+    knownCustomers[index] = newName;
+    localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+    
+    alert("Profile Label Registry Structural Trace Altered.");
     populateCustomerDatalist();
     populateMergeDropdowns();
     renderCustomerManagement();
@@ -451,7 +457,9 @@ function openCustomerModal() {
     document.getElementById('cust-modal-name-input').focus();
 }
 
-function closeCustomerModal() { document.getElementById('customer-name-modal').style.display = 'none'; }
+function closeCustomerModal() {
+    document.getElementById('customer-name-modal').style.display = 'none';
+}
 
 function submitCustomerModal() {
     let rawName = document.getElementById('cust-modal-name-input').value.trim();
@@ -467,20 +475,19 @@ function submitCustomerModal() {
         finalName = rawName.replace(/\b\w/g, char => char.toUpperCase());
         knownCustomers.push(finalName);
         localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
-        populateCustomerDatalist(); 
+        populateCustomerDatalist();
     }
     closeCustomerModal();
-    executeTokenPrinting(finalName); 
+    executeTokenPrinting(finalName);
 }
 
-// POS Dynamic Grid Generators & Component Actions Layer
 function renderCategoryFilters() {
     const container = document.getElementById('category-filter-container');
     container.innerHTML = '';
     let categories = ["All", "Rice", "Curry", "Bread", "Others"];
     categories.forEach(cat => {
         let btn = document.createElement('button');
-        btn.className = `category-filter-btn ${currentActiveCategory === cat ? 'active' : ''}`;
+        btn.className = 'category-filter-btn' + (currentActiveCategory === cat ? ' active' : '');
         btn.innerText = cat;
         btn.onclick = () => {
             currentActiveCategory = cat;
@@ -491,72 +498,54 @@ function renderCategoryFilters() {
     });
 }
 
-function getItemCategory(itemName) {
-    let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-    return found ? found.category : "Others";
-}
-
-function getItemWeight(itemName) {
-    let found = customItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-    return found && found.weight ? parseFloat(found.weight) : 0;
-}
-
 function renderMenu() {
     const grid = document.getElementById('items-grid');
     grid.innerHTML = '';
-    customItems.forEach((itemObj, index) => {
-        if (currentActiveCategory !== "All" && itemObj.category !== currentActiveCategory) return;
+    let itemsToRender = customItems;
+    if (currentActiveCategory !== "All") {
+        itemsToRender = customItems.filter(i => i.category === currentActiveCategory);
+    }
+    itemsToRender.forEach(item => {
         let card = document.createElement('div');
         card.className = 'menu-card';
-        card.innerText = itemObj.name;
-        card.onclick = () => { addToCart(itemObj.name); };
+        card.innerText = item.name;
+        card.onclick = () => addToCart(item.name);
         grid.appendChild(card);
     });
-}
-
-function addNewItem() {
-    const nameInput = document.getElementById('new-item-name');
-    const catSelect = document.getElementById('new-item-category');
-    const weightInput = document.getElementById('new-item-weight');
-    const name = nameInput.value.trim();
-    const weight = parseInt(weightInput.value) || 0;
-    if(!name) return;
-    customItems.push({ name: name, category: catSelect.value, weight: weight });
-    localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
-    nameInput.value = '';
-    weightInput.value = '';
-    alert(`Successfully mapped item allocation array schema instance.`);
-    renderMenu();
-    renderMenuWeightsManagement();
 }
 
 function renderCart() {
     const container = document.getElementById('cart-container');
     container.innerHTML = '';
     if (Object.keys(currentCart).length === 0) {
-        container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding-top:45px; margin:0; font-size: 13px;">Queue Array Buffer Allocation Empty</p>';
+        container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:24px 0; margin:0; font-size:14px; font-weight:500;">Basket Queue Empty</p>';
         return;
     }
     for (let item in currentCart) {
-        let div = document.createElement('div');
-        div.className = 'cart-row';
-        div.innerHTML = `
-            <span style="font-weight: 600;">${item}</span>
-            <div class="qty-controls">
+        let qty = currentCart[item];
+        let row = document.createElement('div');
+        row.className = 'cart-item-row';
+        row.innerHTML = `
+            <span class="cart-item-name">${item}</span>
+            <div class="cart-qty-controls">
                 <button class="qty-btn" onclick="changeQty('${item}', -1)">-</button>
-                <span style="font-weight:700; width:24px; text-align:center;">${currentCart[item]}</span>
+                <span class="qty-val">${qty}</span>
                 <button class="qty-btn" onclick="changeQty('${item}', 1)">+</button>
             </div>
         `;
-        container.appendChild(div);
+        container.appendChild(row);
     }
+    localStorage.setItem('currentCart', JSON.stringify(currentCart));
 }
 
-function addToCart(item) { currentCart[item] = (currentCart[item] || 0) + 1; renderCart(); }
+function addToCart(item) {
+    currentCart[item] = (currentCart[item] || 0) + 1;
+    renderCart();
+}
 
-function changeQty(item, amount) { 
-    currentCart[item] += amount; 
-    if (currentCart[item] <= 0) delete currentCart[item]; 
+function changeQty(item, amount) {
+    currentCart[item] += amount;
+    if (currentCart[item] <= 0) delete currentCart[item];
     renderCart();
 }
 
@@ -566,11 +555,16 @@ function updateLiveBreakdown() {
         container.innerHTML = '<p style="color:#94a3b8; text-align:center; margin:0; font-size:13px;">Live operational transaction vectors empty.</p>';
         return;
     }
-    let grossCount = 0; let refundCount = 0; let itemTotals = {};
-
-    currentDayLog.forEach(log => { grossCount += log.qty; itemTotals[log.item] = (itemTotals[log.item] || 0) + log.qty; });
-    currentRefundLog.forEach(log => { refundCount += log.qty; });
-
+    let grossCount = 0;
+    let refundCount = 0;
+    let itemTotals = {};
+    currentDayLog.forEach(log => {
+        grossCount += log.qty;
+        itemTotals[log.item] = (itemTotals[log.item] || 0) + log.qty;
+    });
+    currentRefundLog.forEach(log => {
+        refundCount += log.qty;
+    });
     let rangeStr = shiftStartTime ? ` (Opened: ${shiftStartTime})` : '';
     let html = `
         <div style="font-size:13px; margin-bottom:12px; color:var(--text-muted);">
@@ -578,58 +572,44 @@ function updateLiveBreakdown() {
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span>Gross Generated Logs:</span><span style="font-weight:600; color:var(--text-main);">${grossCount + refundCount} Units</span>
             </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--danger);">
-                <span>Liquidated Void Logs:</span><span style="font-weight:600;">-${refundCount} Units</span>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>Active Ledger Volume:</span><span style="font-weight:600; color:var(--accent);">${grossCount} Units</span>
             </div>
-            <div style="display:flex; justify-content:space-between; font-weight:800; border-top:1px solid var(--border); padding-top:6px; font-size:14px; color:var(--accent);">
-                <span>Net Verified Shift Inventory:</span><span>${grossCount} Units</span>
+            <div style="display:flex; justify-content:space-between;">
+                <span>Void Signals Intercepted:</span><span style="font-weight:600; color:var(--danger);">${refundCount} Units</span>
             </div>
         </div>
-        <div style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;">Dynamic Mass Metrics Breakdown</div>
-        <table style="width:100%; font-size:13px; color:var(--text-main); border-collapse:collapse;">
+        <div style="border-top:1px solid var(--border); padding-top:10px;">
+            <div style="font-size:11px; font-weight:800; color:var(--text-main); text-transform:uppercase; margin-bottom:6px;">Itemized Scale Aggregate Volume</div>
     `;
-
-    let categoryOrder = ["Rice", "Curry", "Bread", "Others"];
-    categoryOrder.forEach(cat => {
-        let catHeaderAdded = false;
-        for (let item in itemTotals) {
-            if (getItemCategory(item) === cat) {
-                if (!catHeaderAdded) {
-                    html += `<tr><td colspan="2" style="font-size:11px; font-weight:800; color:var(--primary); padding:6px 0 2px 0; text-transform:uppercase;">${cat}</td></tr>`;
-                    catHeaderAdded = true;
-                }
-                let calcWeightKg = ((itemTotals[item] * getItemWeight(item)) / 1000).toFixed(2);
-                html += `<tr>
-                    <td style="padding:2px 0 2px 8px; font-weight:500;">${item}</td>
-                    <td style="text-align:right; font-weight:700; color:var(--text-main);">x${itemTotals[item]} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(${calcWeightKg} KG)</span></td>
-                </tr>`;
-            }
-        }
-    });
-    html += `</table>`;
+    for(let itm in itemTotals) {
+        let massKg = ((itemTotals[itm] * getItemWeight(itm)) / 1000).toFixed(2);
+        html += `
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color:var(--text-main);">
+                <span>${itm}:</span>
+                <span style="font-weight:600;">${itemTotals[itm]} Units (${massKg} KG)</span>
+            </div>
+        `;
+    }
+    html += `</div>`;
     container.innerHTML = html;
 }
 
-// Render Table Logs (Updated with visible token stamp display module)
 function renderLogs() {
-    const logBody = document.getElementById('live-log');
+    const logBody = document.getElementById('live-log-tbody');
     logBody.innerHTML = '';
-    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No item array stream signals captured.</td></tr>`; }
-    
-    for(let i = currentDayLog.length - 1; i >= 0; i--) {
+    if(currentDayLog.length === 0) {
+        logBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:30px; font-size:13px;">No transaction logs generated in current workspace runtime session.</td></tr>`;
+    }
+    for (let i = currentDayLog.length - 1; i >= 0; i--) {
         let log = currentDayLog[i];
-        let customerDisplay = log.customer ? `<div style="font-size:11px; color:var(--primary); font-weight:700;">Profile Account: ${log.customer}</div>` : '';
         let itemWeightKg = ((log.qty * getItemWeight(log.item)) / 1000).toFixed(2);
-        
-        // Dynamic Token Badge String Module
-        let tokenDisplay = `<div style="font-size:11px; font-weight:800; color:var(--danger); margin-bottom:2px;">TOKEN #${log.tokenNum || 'N/A'}</div>`;
-
         let row = `<tr>
             <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
             <td>
-                ${tokenDisplay}
-                <div style="font-weight:600; color:var(--text-main);">${log.item}</div>
-                ${customerDisplay}
+                <div style="font-size:11px; font-weight:800; color:var(--primary); margin-bottom:2px;">TOKEN #${log.tokenNum || 'N/A'}</div>
+                <div style="font-weight:700; color:var(--text-main);">${log.item}</div>
+                <div style="font-size:11px; color:var(--text-muted);">Registry Mapping Key: <span style="font-weight:600; color:var(--text-main);">${log.customer || 'Walk-In'}</span></div>
             </td>
             <td style="text-align:center; font-weight:700; color:var(--primary);">x${log.qty}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${itemWeightKg} KG</span></td>
             <td style="text-align:center;"><button class="btn-action-small btn-refund" onclick="refundLogItem(${i})">Void</button></td>
@@ -639,8 +619,9 @@ function renderLogs() {
 
     const refundBody = document.getElementById('refund-log');
     refundBody.innerHTML = '';
-    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generated.</td></tr>`; }
-    
+    if(currentRefundLog.length === 0) {
+        refundBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generated.</td></tr>`;
+    }
     for(let j = currentRefundLog.length - 1; j >= 0; j--) {
         let rLog = currentRefundLog[j];
         let itemWeightKg = ((rLog.qty * getItemWeight(rLog.item)) / 1000).toFixed(2);
@@ -650,77 +631,64 @@ function renderLogs() {
                 <div style="font-size:11px; font-weight:800; color:var(--text-muted); margin-bottom:2px;">TOKEN #${rLog.tokenNum || 'N/A'}</div>
                 ${rLog.item}
             </td>
-            <td style="text-align:center; font-weight:700; color:var(--danger);">x${rLog.qty}<br><span style="font-size:10px; font-weight:normal;">-${itemWeightKg} KG</span></td>
+            <td style="text-align:center; font-weight:700; color:var(--danger);">x${rLog.qty}<br><span style="font-size:10px; text-decoration: line-through; font-weight:normal;">${itemWeightKg} KG</span></td>
         </tr>`;
         refundBody.insertAdjacentHTML('beforeend', row);
     }
 
-    updateLiveBreakdown();
-
-    const histContainer = document.getElementById('history-container');
-    histContainer.innerHTML = '';
-    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger history index empty array structure.</p>'; }
-    
-    allTimeHistory.forEach((day, index) => {
-        let normalizedDateLabel = normalizeToSystemDate(day.date);
-        let rangeSuffix = (day.startTime && day.endTime) ? ` (${day.startTime} to ${day.endTime})` : '';
-
-        let html = `<div class="history-card">
-            <button class="delete-history-btn" onclick="deleteHistoryItem(${index})">×</button>
-            <div class="history-header">
-                <span>Date Scope Trace: <strong>${normalizedDateLabel}</strong></span>
-                <span style="color:var(--primary); font-size:11px;">Timeline Boundary: <strong>${rangeSuffix || 'N/A'}</strong></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:11px; color:var(--text-muted);">
-                <span>Gross: ${day.grossItems || day.totalItems} | Voided: ${day.refundedItems || 0}</span>
-                <span style="color:var(--accent); font-weight:bold;">Net Operational Sum: ${day.totalItems}</span>
-            </div>
-            <table style="width:100%; font-size:13px; color:#475569;">`;
-        
-        let categoryOrder = ["Rice", "Curry", "Bread", "Others"];
-        categoryOrder.forEach(cat => {
-            let catHeaderAdded = false;
-            for(let itm in day.summary) {
-                if(getItemCategory(itm) === cat) {
-                    if(!catHeaderAdded) {
-                        html += `<tr><td colspan="2" style="font-size:11px; font-weight:700; color:var(--primary); padding-top:6px; text-transform:uppercase;">${cat}</td></tr>`;
-                        catHeaderAdded = true;
-                    }
-                    let histItemWeight = ((day.summary[itm] * getItemWeight(itm)) / 1000).toFixed(2);
-                    html += `<tr><td style="padding:2px 0 2px 6px;">${itm}</td><td style="text-align:right; font-weight:600; color:var(--text-main);">x${day.summary[itm]} <span style="font-size:11px; font-weight:normal; color:var(--text-muted);">(${histItemWeight} KG)</span></td></tr>`;
-                }
+    const historyContainer = document.getElementById('saved-history-container');
+    historyContainer.innerHTML = '';
+    if (allTimeHistory.length === 0) {
+        historyContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:20px; font-size:13px;">Historical structural persistent ledger partitions empty.</p>';
+    } else {
+        for(let k = allTimeHistory.length - 1; k >= 0; k--) {
+            let day = allTimeHistory[k];
+            let dateTitle = normalizeToSystemDate(day.date);
+            let block = document.createElement('div');
+            block.className = 'history-block';
+            let itemSummaryHTML = '';
+            for (let itm in day.summary) {
+                itemSummaryHTML += `<div style="font-size:12px; margin-bottom:2px; display:flex; justify-content:space-between;">
+                    <span>${itm}:</span><b>${day.summary[itm]} Units</b>
+                </div>`;
             }
-        });
-        html += `</table>`;
-        
-        if (day.detailedTimeline && day.detailedTimeline.length > 0) {
-            html += `<div style="font-weight:700; font-size:11px; margin-top:12px; color:var(--text-muted); text-transform:uppercase; border-top: 1px dashed var(--border); padding-top: 8px;">Chronological Action Log Flow</div><div class="timeline-box">`;
-            day.detailedTimeline.forEach(t => {
-                let styleRule = t.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-main);';
-                let nameSuffix = t.customer ? ` (${t.customer})` : '';
-                let wCalc = ((t.qty * getItemWeight(t.item)) / 1000).toFixed(2);
-                let tNumDisplay = t.tokenNum ? `[#${t.tokenNum}] ` : '';
-                html += `<div style="margin-bottom:4px; ${styleRule}">[${t.time}] ${tNumDisplay}${t.type}: ${t.item}${nameSuffix} x${t.qty} (${wCalc} KG)</div>`;
-            });
-            html += `</div>`;
+            block.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
+                    <span style="font-weight:800; color:var(--text-main); font-size:13px;">${dateTitle}</span>
+                    <span style="font-size:10px; font-weight:700; background:#f1f5f9; padding:2px 6px; border-radius:4px; color:var(--text-muted);">${day.startTime || 'N/A'} - ${day.endTime || 'N/A'}</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">
+                    Net Units: <b style="color:var(--accent);">${day.totalItems}</b> | Gross: <b>${day.grossItems || day.totalItems}</b> | Voids: <b style="color:var(--danger);">${day.refundedItems || 0}</b>
+                </div>
+                <div style="background:#f8fafc; padding:6px; border-radius:6px; margin-bottom:8px;">${itemSummaryHTML}</div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-action-small btn-edit" style="font-size:10px; padding:4px 8px;" onclick="printHistoricalReport(${k})">Print Slip</button>
+                    <button class="btn-action-small btn-refund" style="font-size:10px; padding:4px 8px; background:#fef2f2; color:var(--danger);" onclick="purgeHistoricalIndex(${k})">Wipe Shift</button>
+                </div>
+            `;
+            historyContainer.appendChild(block);
         }
-        html += `<button class="print-report-btn" onclick="printSummaryReport(${index})">Generate Thermal Report</button></div>`;
-        histContainer.insertAdjacentHTML('afterbegin', html);
-    });
+    }
+    updateLiveBreakdown();
+}
+
+function getItemWeight(itemName) {
+    let target = customItems.find(i => i.name === itemName);
+    return target ? (target.weight || 0) : 0;
 }
 
 function refundLogItem(index) {
-    if (!confirm("Execute target data structure mutation termination override script?")) return;
+    if(!confirm("Are you sure you want to VOID this transaction log? This action requires management override keys.")) return;
     openPinModal("Verification authorization protocols requested.", "refund", function() {
         let now = new Date();
         let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         let targetItem = currentDayLog[index];
-        let refundObject = { 
+        let refundObject = {
             tokenNum: targetItem.tokenNum,
-            time: refundTime, 
-            item: targetItem.item, 
-            qty: targetItem.qty, 
-            customer: targetItem.customer || "Walk-In" 
+            time: refundTime,
+            item: targetItem.item,
+            qty: targetItem.qty,
+            customer: targetItem.customer || "Walk-In"
         };
         currentRefundLog.push(refundObject);
         localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
@@ -740,166 +708,95 @@ function printSingleRefundToken(refundObj) {
     token.innerHTML = `
         <div class="brand-main">AHMED HANIF RAJPUT</div>
         <div style="font-size: 14px; font-weight: 900; text-align: center; color: #ffffff !important; background-color: #000000 !important; padding: 2px 0; margin: 4px 0;">[ VOID CANCEL ]</div>
-        <div style="font-family: Arial, sans-serif !important; font-size: 18px; font-weight: 900; text-align: center; color: #000000 !important; margin: 4px 0;">VOIDED TOKEN: #${refundObj.tokenNum || 'N/A'}</div>
-        <div class="pos-divider"></div>
-        <div class="item-container">
-            <div class="pos-item" style="text-decoration: line-through;">${refundObj.item}</div>
-            <div class="pos-qty">TERMINATED: [ ${refundObj.qty} ]</div>
-            <div style="font-weight:900; font-size:14px; margin-top:4px;">-${weightStr} KG</div>
+        <div style="font-family: Arial, sans-serif !important; font-size: 11px; font-weight: 900; margin-bottom: 6px; text-align: center;">
+            TIME: ${refundObj.time} &nbsp;&nbsp; TOKEN: #${refundObj.tokenNum || 'N/A'}
         </div>
         <div class="pos-divider"></div>
-        <div class="meta-line">DATE: ${getFormattedSystemDate()} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${refundObj.time}</div>
+        <div style="font-size:14px; font-weight:900; margin: 4px 0;">${refundObj.item}</div>
+        <div style="font-size:13px; font-weight:900;">QTY: <span style="font-size:16px;">${refundObj.qty}</span></div>
+        <div class="pos-divider"></div>
+        <div style="font-size:11px; font-weight:900; text-align:center; margin-top:4px;">Account Track: ${refundObj.customer}</div>
     `;
     printArea.appendChild(token);
-    setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
+    setTimeout(() => {
+        window.print();
+        printArea.innerHTML = '';
+    }, 50);
 }
 
-function printSummaryReport(index) {
-    const day = allTimeHistory[index];
-    const printArea = document.getElementById('print-area');
-    printArea.innerHTML = '';
-    let topItem = "None"; let maxQty = 0;
-    for (let itm in day.summary) { if (day.summary[itm] > maxQty) { maxQty = day.summary[itm]; topItem = itm; } }
-    let reportDiv = document.createElement('div');
-    reportDiv.className = 'pos-report';
-    let itemsHtml = '';
-    let categoryOrder = ["Rice", "Curry", "Bread", "Others"];
-    categoryOrder.forEach(cat => {
-        let catHeaderPrinted = false;
-        for (let itm in day.summary) {
-            if (getItemCategory(itm) === cat) {
-                if (!catHeaderPrinted) {
-                    itemsHtml += `<div class="report-category-header">${cat}</div>`;
-                    catHeaderPrinted = true;
-                }
-                let wStr = ((day.summary[itm] * getItemWeight(itm)) / 1000).toFixed(2);
-                itemsHtml += `<div class="report-row"><span>&nbsp;&nbsp;${itm.toUpperCase()}</span><span>x${day.summary[itm]} (${wStr} KG)</span></div>`;
-            }
-        }
-    });
-    let timeRangeTitle = (day.startTime && day.endTime) ? `${day.startTime} TO ${day.endTime}` : 'SHIFT REPORT';
-    reportDiv.innerHTML = `
-        <div class="brand-main">AHMED HANIF RAJPUT</div>
-        <div class="report-title">SHIFT ANALYSIS METRICS</div>
-        <div class="meta-line">DATE: ${normalizeToSystemDate(day.date)}</div>
-        <div class="meta-line">SHIFT BLOCK: ${timeRangeTitle}</div>
-        <div class="pos-divider"></div>
-        <div class="report-row"><span>GROSS EMITTED:</span><span>${day.grossItems || day.totalItems} Units</span></div>
-        <div class="report-row"><span>VOIDED EXECUTIONS:</span><span>${day.refundedItems || 0} Units</span></div>
-        <div class="report-row" style="border-top:2px solid #000000 !important; padding-top:4px;"><span>NET INVENTORY TOTAL:</span><span>${day.totalItems} Units</span></div>
-        <div class="pos-divider-thin"></div>
-        <div style="font-size:11px; font-weight:900; margin-bottom:4px; text-align:center; text-transform:uppercase;">Dynamic Net Mass Quantization</div>
-        ${itemsHtml}
-        <div class="pos-divider-thin" style="margin-top:6px;"></div>
-        <div class="highlight-box">
-            <div style="font-size: 11px; font-weight: 900;">MAX ACCUMULATED VOLUME</div>
-            <div style="font-size: 18px; font-weight: 900; text-transform: uppercase; margin: 2px 0;">${topItem}</div>
-            <div style="font-size: 12px; font-weight: 900;">Units count: ${maxQty}</div>
-        </div>
-        <div class="pos-divider"></div>
-    `;
-    printArea.appendChild(reportDiv);
-    setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
-}
-
-function printTokens() {
-    if (Object.keys(currentCart).length === 0) return;
-    openCustomerModal();
-}
-
-// Token Printing Generator (Updated: Incremental Token Number Stamping Active & Weights completely hidden)
-function executeTokenPrinting(customerName) {
-    const printArea = document.getElementById('print-area');
-    printArea.innerHTML = ''; 
-    let now = new Date();
-    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    let dateStr = getFormattedSystemDate(now);
-
-    if (!shiftStartTime) {
-        shiftStartTime = timeStr;
-        localStorage.setItem('shiftStartTime', shiftStartTime);
+function addNewItem() {
+    let nameIn = document.getElementById('new-item-name');
+    let catIn = document.getElementById('new-item-category');
+    let weightIn = document.getElementById('new-item-weight');
+    
+    let name = nameIn.value.trim().replace(/\b\w/g, char => char.toUpperCase());
+    let category = catIn.value;
+    let weight = parseInt(weightIn.value) || 0;
+    
+    if(!name) {
+        alert("Menu Item Label cannot be left transparent.");
+        return;
     }
-
-    for (let item in currentCart) {
-        let qty = currentCart[item];
-        
-        // Auto-increment and update persistent state
-        globalTokenCounter++;
-        localStorage.setItem('globalTokenCounter', globalTokenCounter);
-
-        currentDayLog.push({ 
-            tokenNum: globalTokenCounter,
-            time: timeStr, 
-            item: item, 
-            qty: qty, 
-            customer: customerName 
-        });
-
-        let token = document.createElement('div');
-        token.className = 'pos-token';
-        
-        // Render block layout with zero weight references
-        token.innerHTML = `
-            <div class="brand-main">AHMED HANIF RAJPUT</div>
-            <div style="font-family: Arial, sans-serif !important; font-size: 24px; font-weight: 900; text-align: center; color: #000000 !important; border: 2px solid #000000; padding: 4px 0; margin: 4px 0;">TOKEN NO: ${globalTokenCounter}</div>
-            <div class="pos-divider"></div>
-            <div class="item-container">
-                <div class="pos-item">${item}</div>
-                <div class="pos-qty">UNITS COUNT: [ ${qty} ]</div>
-            </div>
-            <div class="pos-divider"></div>
-            <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
-            <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase;">ACCOUNT MAPPING: ${customerName}</div>
-        `;
-        printArea.appendChild(token);
+    if(customItems.some(i => i.name.toLowerCase() === name.toLowerCase())) {
+        alert("This item definition label already exists in the local engine ecosystem mapping.");
+        return;
     }
-    localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-    setTimeout(() => { window.print(); currentCart = {}; renderCart(); renderLogs(); }, 50);
-}
-
-function deleteHistoryItem(index) {
-    if (!confirm("Permanently drop selected ledger sequence index container?")) return;
-    openPinModal("Management authentication validation parameters active.", "admin", function() {
-        allTimeHistory.splice(index, 1);
-        localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
-        renderLogs();
-    });
-}
-
-function clearAllHistory() {
-    if (!confirm("Purge entire core relational historical index architecture? Warning: Action is terminal.")) return;
-    openPinModal("Administrative security credentials requested.", "admin", function() {
-        allTimeHistory = [];
-        localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
-        renderLogs();
-    });
+    
+    customItems.push({ name, category, weight });
+    localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
+    
+    alert(`"${name}" initialization successfully injected.`);
+    nameIn.value = '';
+    weightIn.value = '';
+    
+    renderMenu();
+    renderMenuWeightsManagement();
 }
 
 function attemptStartNewDay() {
-    openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
-        startNewDay();
-        alert("New operational tracking register open.");
-    });
+    if (currentDayLog.length > 0 || currentRefundLog.length > 0) {
+        if (!confirm("Active data matrices detected in current session. Open a completely new empty day anyway?")) {
+            return;
+        }
+    }
+    localStorage.removeItem('currentCart');
+    localStorage.removeItem('currentDayLog');
+    localStorage.removeItem('currentRefundLog');
+    localStorage.removeItem('shiftStartTime');
+    currentCart = {};
+    currentDayLog = [];
+    currentRefundLog = [];
+    shiftStartTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    localStorage.setItem('shiftStartTime', shiftStartTime);
+    renderCart();
+    renderLogs();
+    alert("System Runtime Matrix Initialized. Shift Timer Clock Triggered.");
 }
 
-function startNewDay() {
-    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
-    globalTokenCounter = 100; // Counter sequence defaults clean
-    localStorage.setItem('globalTokenCounter', globalTokenCounter);
-
-    localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
+function purgeHistoricalIndex(index) {
+    if(!confirm("CRITICAL ACCESSIBILITY ALERT: Delete this permanent day segment log index from browser local storage framework?")) return;
+    allTimeHistory.splice(index, 1);
+    localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    renderLogs();
 }
 
 function endDay() {
-    if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state queue registry matrices isolated as null.");
-    if (!confirm("Terminate current operational runtime cycle window parameters and shift dataset structures?")) return;
-    openPinModal("Administrative security checkpoint logic verified execution keys.", "admin", function() {
-        let netItems = 0; let grossItemsCount = 0; let summary = {}; let detailedTimeline = [];
-
-        currentDayLog.forEach(log => { 
-            netItems += log.qty; grossItemsCount += log.qty;
-            summary[log.item] = (summary[log.item] || 0) + log.qty; 
+    if (currentDayLog.length === 0 && currentRefundLog.length === 0) {
+        alert("Active structural log storage empty. Closure signal rejected.");
+        return;
+    }
+    if (!confirm("Are you sure you want to close this shift session? This action logs active metrics into persistent archives.")) return;
+    
+    openPinModal("Verification authorization keys required.", "admin", function() {
+        let netItems = 0;
+        let grossItemsCount = 0;
+        let summary = {};
+        let detailedTimeline = [];
+        
+        currentDayLog.forEach(log => {
+            netItems += log.qty;
+            grossItemsCount += log.qty;
+            summary[log.item] = (summary[log.item] || 0) + log.qty;
             detailedTimeline.push({time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer, tokenNum: log.tokenNum});
         });
         currentRefundLog.forEach(log => {
@@ -913,79 +810,255 @@ function endDay() {
         let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
         let shiftClosingTimestamp = getFormattedSystemDate();
         
-        let dayRecord = { 
-            date: shiftClosingTimestamp, 
+        let dayRecord = {
+            date: shiftClosingTimestamp,
             startTime: shiftOpeningTime,
             endTime: shiftClosingTime,
-            totalItems: netItems, 
+            totalItems: netItems,
             grossItems: grossItemsCount,
-            refundedItems: currentRefundLog.length, 
-            summary: summary, 
+            refundedItems: currentRefundLog.length,
+            summary: summary,
             detailedTimeline: detailedTimeline
         };
+        
         allTimeHistory.push(dayRecord);
         localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
         
-        currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
-        localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
+        printReport(dayRecord);
         
+        localStorage.removeItem('currentCart');
+        localStorage.removeItem('currentDayLog');
+        localStorage.removeItem('currentRefundLog');
+        localStorage.removeItem('shiftStartTime');
+        currentCart = {};
+        currentDayLog = [];
+        currentRefundLog = [];
+        shiftStartTime = null;
+        
+        renderCart();
         renderLogs();
-        switchView('history-tab');
+        alert("Active Matrix Cleared & Successfully Archived into Permanent Data Blocks.");
     });
 }
 
-function getAllConsumptionData() {
-    let rows = [];
-    let liveLabel = getFormattedSystemDate();
-    currentDayLog.forEach(l => {
-        rows.push({ date: liveLabel, shiftId: "LIVE", time: l.time, customer: l.customer || "Walk-In", item: l.item, qty: l.qty, type: "SALE", tokenNum: l.tokenNum });
-    });
-    currentRefundLog.forEach(r => {
-        rows.push({ date: liveLabel, shiftId: "LIVE", time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: "REFUND", tokenNum: r.tokenNum });
-    });
-    allTimeHistory.forEach((day, idx) => {
-        if (day.detailedTimeline) {
-            day.detailedTimeline.forEach(t => {
-                let rangeStr = (day.startTime && day.endTime) ? ` [${day.startTime}-${day.endTime}]` : '';
-                rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type, tokenNum: t.tokenNum });
-            });
-        }
-    });
-    return rows;
+function printReport(dayRecord) {
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+    let reportDiv = document.createElement('div');
+    reportDiv.className = 'pos-report';
+    let dateStr = normalizeToSystemDate(dayRecord.date);
+    let itemsHTML = '';
+    let categoriesTotal = {};
+    for (let item in dayRecord.summary) {
+        let qty = dayRecord.summary[item];
+        let target = customItems.find(i => i.name === item);
+        let cat = target ? target.category : "Others";
+        let weightFactor = target ? target.weight : 0;
+        let massTotalKg = ((qty * weightFactor) / 1000).toFixed(2);
+        if (!categoriesTotal[cat]) categoriesTotal[cat] = { count: 0, weight: 0 };
+        categoriesTotal[cat].count += qty;
+        categoriesTotal[cat].weight += (qty * weightFactor);
+        itemsHTML += `
+            <div class="report-row">
+                <span style="font-weight:700;">${item}</span>
+                <span style="font-weight:900;">x${qty} <span style="font-size:11px; font-weight:normal; color:#000;">(${massTotalKg} KG)</span></span>
+            </div>
+        `;
+    }
+    let catSummaryHTML = '';
+    for (let cat in categoriesTotal) {
+        let catKg = (categoriesTotal[cat].weight / 1000).toFixed(2);
+        catSummaryHTML += `
+            <div class="report-row" style="font-size:12px; margin-bottom:2px;">
+                <span>${cat}:</span>
+                <span style="font-weight:900;">${categoriesTotal[cat].count} Units (${catKg} KG)</span>
+            </div>
+        `;
+    }
+    let timelineHTML = '';
+    if(dayRecord.detailedTimeline && dayRecord.detailedTimeline.length > 0) {
+        dayRecord.detailedTimeline.forEach(entry => {
+            let cleanType = entry.type === 'REFUND' ? '[VOID]' : 'SALE';
+            let styleColor = entry.type === 'REFUND' ? 'color:#000; text-decoration:line-through;' : '';
+            let tNumStr = entry.tokenNum ? ` #${entry.tokenNum}` : '';
+            timelineHTML += `
+                <div style="font-size:11px; font-family:Arial, sans-serif; display:flex; justify-content:space-between; margin-bottom:3px; ${styleColor}">
+                    <span>${entry.time} - T${tNumStr} - ${entry.customer || 'Walk-In'}</span>
+                    <span>${cleanType} ${entry.item} x${entry.qty}</span>
+                </div>
+            `;
+        });
+    } else {
+        timelineHTML = '<div style="font-size:11px; text-align:center;">No timeline logs saved.</div>';
+    }
+    reportDiv.innerHTML = `
+        <div class="brand-main">AHMED HANIF RAJPUT</div>
+        <div class="report-title">SHIFT CLOSURE MATRIX REPORT</div>
+        <div class="meta-line">DATE: ${dateStr}</div>
+        <div class="meta-line">TIMEFRAME: ${dayRecord.startTime || 'N/A'} - ${dayRecord.endTime || 'N/A'}</div>
+        <div class="pos-divider"></div>
+        <div class="report-category-header">Itemized Production Multipliers</div>
+        ${itemsHTML}
+        <div class="pos-divider"></div>
+        <div class="report-category-header">Category Load Distribution Summary</div>
+        ${catSummaryHTML}
+        <div class="pos-divider"></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:900; margin-top:4px;">
+            <span>TOTAL QUANTITY MATRIX:</span><span>${dayRecord.totalItems} Units</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:#000; margin-top:2px;">
+            <span>Gross Session Signals:</span><span>${dayRecord.grossItems || dayRecord.totalItems} Units</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:#000;">
+            <span>Intercepted Void Counter:</span><span>${dayRecord.refundedItems || 0} Logs</span>
+        </div>
+        <div class="pos-divider"></div>
+        <div class="report-category-header">Sequential Log Tracking Journal</div>
+        ${timelineHTML}
+        <div class="pos-divider" style="margin-top:12px;"></div>
+        <div style="text-align:center; font-size:10px; font-weight:900; margin-top:6px;">ARCHIVAL END-OF-SHIFT VECTOR RECORD PRINTED</div>
+    `;
+    printArea.appendChild(reportDiv);
+    setTimeout(() => { window.print(); printArea.innerHTML = ''; }, 50);
+}
+
+function printHistoricalReport(index) {
+    let dayRecord = allTimeHistory[index];
+    if(dayRecord) printReport(dayRecord);
+}
+
+function printTokens() {
+    if (Object.keys(currentCart).length === 0) return;
+    openCustomerModal();
+}
+
+// Token Printing Generator (Updated: Small unified line for Date, Time, and Token Number)
+function executeTokenPrinting(customerName) {
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = '';
+    let now = new Date();
+    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let dateStr = getFormattedSystemDate(now);
+    
+    if (!shiftStartTime) {
+        shiftStartTime = timeStr;
+        localStorage.setItem('shiftStartTime', shiftStartTime);
+    }
+    
+    for (let item in currentCart) {
+        let qty = currentCart[item];
+        globalTokenCounter++;
+        localStorage.setItem('globalTokenCounter', globalTokenCounter);
+        
+        currentDayLog.push({
+            tokenNum: globalTokenCounter,
+            time: timeStr,
+            item: item,
+            qty: qty,
+            customer: customerName
+        });
+        
+        let token = document.createElement('div');
+        token.className = 'pos-token';
+        
+        token.innerHTML = `
+            <div class="brand-main">AHMED HANIF RAJPUT</div>
+            <div style="font-family: Arial, sans-serif !important; font-size: 11px; font-weight: 900; margin-bottom: 6px; text-align: center;">
+                DATE: ${dateStr} &nbsp;&nbsp; TIME: ${timeStr} &nbsp;&nbsp; TOKEN: #${globalTokenCounter}
+            </div>
+            <div class="pos-divider"></div>
+            <div style="font-size: 18px; font-weight: 900; margin: 6px 0; text-transform: uppercase; letter-spacing: -0.3px;">${item}</div>
+            <div style="font-size: 14px; font-weight: 900; margin-bottom: 4px;">QTY: <span style="font-size: 22px; font-weight: 900;">${qty}</span></div>
+            <div class="pos-divider"></div>
+            <div style="font-size: 11px; font-weight: 900; text-align: center; margin-top: 4px; text-transform: uppercase;">Mapping: ${customerName}</div>
+        `;
+        printArea.appendChild(token);
+    }
+    
+    currentCart = {};
+    localStorage.removeItem('currentCart');
+    renderCart();
+    renderLogs();
+    
+    setTimeout(() => {
+        window.print();
+        printArea.innerHTML = '';
+    }, 50);
 }
 
 function populateFilterOptions() {
-    let data = getAllConsumptionData();
-    let customers = new Set(); let items = new Set(); let dates = new Set();
-    data.forEach(r => {
+    let cSelect = document.getElementById('filter-cust');
+    let iSelect = document.getElementById('filter-item');
+    let dSelect = document.getElementById('filter-date');
+    
+    let currentC = cSelect ? cSelect.value : "ALL";
+    let currentI = iSelect ? iSelect.value : "ALL";
+    let currentD = dSelect ? dSelect.value : "ALL";
+    
+    let customers = new Set();
+    let items = new Set();
+    let dates = new Set();
+    
+    currentDayLog.forEach(r => {
         if(r.customer) customers.add(r.customer);
         if(r.item) items.add(r.item);
-        if(r.date) dates.add(r.date);
     });
-    let custSel = document.getElementById('filter-cust');
-    let itemSel = document.getElementById('filter-item');
-    let dateSel = document.getElementById('filter-date');
-    custSel.innerHTML = '<option value="ALL">-- All Registry Profiles --</option>';
-    itemSel.innerHTML = '<option value="ALL">-- All Menu Labels --</option>';
-    dateSel.innerHTML = '<option value="ALL">-- All Epoch Shifts --</option>';
-    customers.forEach(c => custSel.innerHTML += `<option value="${c}">${c}</option>`);
-    items.forEach(i => itemSel.innerHTML += `<option value="${i}">${i}</option>`);
-    dates.forEach(d => dateSel.innerHTML += `<option value="${d}">${d}</option>`);
+    currentRefundLog.forEach(r => {
+        if(r.customer) customers.add(r.customer);
+        if(r.item) items.add(r.item);
+    });
+    
+    allTimeHistory.forEach(day => {
+        let dStr = normalizeToSystemDate(day.date);
+        dates.add(dStr);
+        if(day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => {
+                if(entry.customer) customers.add(entry.customer);
+                if(entry.item) items.add(entry.item);
+            });
+        }
+    });
+    
+    if(cSelect) {
+        cSelect.innerHTML = '<option value="ALL">-- All Customer Profiles --</option>';
+        Array.from(customers).sort().forEach(c => {
+            cSelect.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        cSelect.value = currentC;
+        if(cSelect.value !== currentC) cSelect.value = "ALL";
+    }
+    
+    if(iSelect) {
+        iSelect.innerHTML = '<option value="ALL">-- All Menu Labels --</option>';
+        Array.from(items).sort().forEach(i => {
+            iSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        });
+        iSelect.value = currentI;
+        if(iSelect.value !== currentI) iSelect.value = "ALL";
+    }
+    
+    if(dSelect) {
+        dSelect.innerHTML = '<option value="ALL">-- All Historical Dates --</option>';
+        Array.from(dates).sort().forEach(d => {
+            dSelect.innerHTML += `<option value="${d}">${d}</option>`;
+        });
+        dSelect.value = currentD;
+        if(dSelect.value !== currentD) dSelect.value = "ALL";
+    }
 }
 
 function populateShiftSelectorOptions() {
     let selector = document.getElementById('rule-shift-selector');
+    if(!selector) return;
     let currentSelection = selector.value;
-    
-    let liveRange = shiftStartTime ? ` (Opened: ${shiftStartTime})` : ' (Matrix structural space null)';
-    selector.innerHTML = `<option value="LIVE">Active Operational Runtime Engine Segment${liveRange}</option>`;
-    
+    selector.innerHTML = '';
+    let liveRange = shiftStartTime ? ` (Opened ${shiftStartTime})` : ' (No Active Shift Window)';
+    selector.innerHTML += `<option value="LIVE">Active Operational Runtime Engine Segment${liveRange}</option>`;
     allTimeHistory.forEach((day, idx) => {
         let label = normalizeToSystemDate(day.date);
         let timeStr = (day.startTime && day.endTime) ? ` (${day.startTime} to ${day.endTime})` : '';
         selector.innerHTML += `<option value="SHIFT-${idx}">Ledger Segment: ${label}${timeStr}</option>`;
     });
-
     if (currentSelection && selector.querySelector(`option[value="${currentSelection}"]`)) {
         selector.value = currentSelection;
     } else {
@@ -995,123 +1068,186 @@ function populateShiftSelectorOptions() {
 
 function calculateHighConsumptionMatrix(data) {
     let selectedShift = document.getElementById('rule-shift-selector').value;
-
     let riceVal = document.getElementById('rule-rice-limit').value.trim();
     let curryVal = document.getElementById('rule-curry-limit').value.trim();
     let breadVal = document.getElementById('rule-bread-limit').value.trim();
-
+    
     let riceLimit = riceVal !== "" ? parseInt(riceVal) : null;
     let curryLimit = curryVal !== "" ? parseInt(curryVal) : null;
     let breadLimit = breadVal !== "" ? parseInt(breadVal) : null;
-
-    let aggregation = {};
     
+    let aggregation = {};
     data.forEach(r => {
         if (r.shiftId !== selectedShift) return;
-        if (r.type !== 'SALE' || r.customer === 'Walk-In') return;
-        
-        let cat = getItemCategory(r.item);
-        let key = `${r.customer}||${r.item}||${cat}`;
-        aggregation[key] = (aggregation[key] || 0) + r.qty;
+        if (!aggregation[r.customer]) {
+            aggregation[r.customer] = { Rice: 0, Curry: 0, Bread: 0, Others: 0 };
+        }
+        let target = customItems.find(i => i.name === r.item);
+        let cat = target ? target.category : "Others";
+        if (r.type === 'REFUND') {
+            aggregation[r.customer][cat] -= r.qty;
+        } else {
+            aggregation[r.customer][cat] += r.qty;
+        }
     });
     
-    let tbody = document.getElementById('high-consumption-tbody');
-    tbody.innerHTML = '';
-    let anomaliesFound = false;
-
-    for (let key in aggregation) {
-        let [customer, item, category] = key.split('||');
-        let totalQty = aggregation[key];
-        let shouldFlag = false; 
-        let alertMsg = "";
-        let calculatedW = ((totalQty * getItemWeight(item)) / 1000).toFixed(2);
-
-        if (category === "Rice" && riceLimit !== null && totalQty >= riceLimit) {
-            shouldFlag = true;
-            alertMsg = `Rice Limit Breach Alert (≥ ${riceLimit} Units)`;
-        } else if (category === "Curry" && curryLimit !== null && totalQty >= curryLimit) {
-            shouldFlag = true;
-            alertMsg = `Curry Threshold Flagged Trigger (≥ ${curryLimit} Orders)`;
-        } else if (category === "Bread" && breadLimit !== null && totalQty >= breadLimit) {
-            shouldFlag = true;
-            alertMsg = `Bulk Unit Bread Overflow Logic (≥ ${breadLimit} Pieces)`;
-        }
+    let violations = [];
+    for (let cust in aggregation) {
+        let profile = aggregation[cust];
+        let triggers = [];
+        if (riceLimit !== null && profile.Rice >= riceLimit) triggers.push(`Rice Block Threshold Crossed (${profile.Rice}/${riceLimit})`);
+        if (curryLimit !== null && profile.Curry >= curryLimit) triggers.push(`Curry Block Threshold Crossed (${profile.Curry}/${curryLimit})`);
+        if (breadLimit !== null && profile.Bread >= breadLimit) triggers.push(`Bread Block Threshold Crossed (${profile.Bread}/${breadLimit})`);
         
-        if (shouldFlag) {
-            anomaliesFound = true;
-            let tr = `<tr>
-                <td style="font-weight:700; color:var(--text-main);">${customer}</td>
-                <td>${item}</td>
-                <td style="font-weight:600; color:var(--primary);">${category}</td>
-                <td style="text-align:right; font-weight:800; color:var(--danger);">x${totalQty}</td>
-                <td style="text-align:right; font-weight:800;">${calculatedW} KG</td>
-                <td><span class="flag-pill flag-high">⚠️ ${alertMsg}</span></td>
-            </tr>`;
-            tbody.insertAdjacentHTML('beforeend', tr);
+        if (triggers.length > 0) {
+            violations.push({ customer: cust, triggers: triggers });
         }
     }
-    if (!anomaliesFound) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:16px; font-size:13px;">No critical boundary tracking triggers flagged. System context baseline stable.</td></tr>`;
+    
+    let ruleDiv = document.getElementById('consumption-rules-logs');
+    if (!ruleDiv) return;
+    ruleDiv.innerHTML = '';
+    
+    if (violations.length === 0) {
+        ruleDiv.innerHTML = '<div style="color:var(--accent); font-weight:700; font-size:13px; padding:12px; border:1px solid #bbf7d0; background:#f0fdf4; border-radius:6px;">Operational Parameter Safe State: Zero limit boundary violations detected inside current window selection.</div>';
+        return;
     }
+    
+    violations.forEach(v => {
+        let triggerList = v.triggers.map(t => `<li style="margin-bottom:2px;">${t}</li>`).join('');
+        ruleDiv.innerHTML += `
+            <div style="border:1px solid #fca5a5; background:#fef2f2; padding:10px; border-radius:6px; margin-bottom:8px; font-size:13px;">
+                <div style="font-weight:800; color:var(--danger); margin-bottom:4px;">Identity Tracker Trigger: ${v.customer}</div>
+                <ul style="margin:0; padding-left:16px; font-weight:600; color:#7f1d1d;">${triggerList}</ul>
+            </div>
+        `;
+    });
 }
 
 function renderConsumptionReport() {
-    let data = getAllConsumptionData();
-    calculateHighConsumptionMatrix(data);
+    const tbody = document.getElementById('consumption-report-tbody');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    
     let fCust = document.getElementById('filter-cust').value;
     let fItem = document.getElementById('filter-item').value;
     let fDate = document.getElementById('filter-date').value;
-    let tbody = document.getElementById('consumption-report-tbody');
-    tbody.innerHTML = '';
-
-    let filtered = data.filter(r => {
+    
+    let structuralDataset = [];
+    
+    currentDayLog.forEach(r => {
+        structuralDataset.push({
+            date: getFormattedSystemDate(),
+            time: r.time,
+            customer: r.customer || "Walk-In",
+            item: r.item,
+            qty: r.qty,
+            type: 'SALE',
+            shiftId: 'LIVE',
+            tokenNum: r.tokenNum
+        });
+    });
+    
+    currentRefundLog.forEach(r => {
+        structuralDataset.push({
+            date: getFormattedSystemDate(),
+            time: r.time,
+            customer: r.customer || "Walk-In",
+            item: r.item,
+            qty: r.qty,
+            type: 'REFUND',
+            shiftId: 'LIVE',
+            tokenNum: r.tokenNum
+        });
+    });
+    
+    allTimeHistory.forEach((day, idx) => {
+        let dayDateLabel = normalizeToSystemDate(day.date);
+        if(day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => {
+                structuralDataset.push({
+                    date: dayDateLabel,
+                    time: entry.time,
+                    customer: entry.customer || "Walk-In",
+                    item: entry.item,
+                    qty: entry.qty,
+                    type: entry.type || 'SALE',
+                    shiftId: `SHIFT-${idx}`,
+                    tokenNum: entry.tokenNum
+                });
+            });
+        }
+    });
+    
+    calculateHighConsumptionMatrix(structuralDataset);
+    
+    let filtered = structuralDataset.filter(r => {
         if (fCust !== "ALL" && r.customer !== fCust) return false;
         if (fItem !== "ALL" && r.item !== fItem) return false;
         if (fDate !== "ALL" && r.date !== fDate) return false;
         return true;
     });
+    
     if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No ledger entries matched filter constraint attributes.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No ledger entries matched filter constraint attributes.</td></tr>`;
         return;
     }
+    
     filtered.forEach(r => {
-        let statusStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; background:#fee2e2; padding:4px 8px; border-radius:4px;' : 'color:var(--accent); font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:4px;';
-        let qtyStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; text-align:right;' : 'font-weight:700; text-align:right;';
-        let displayQty = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
-        let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
-        let displayWeight = r.type === 'REFUND' ? `-${calcWeightKg}` : calcWeightKg;
-        let tokenString = r.tokenNum ? ` [T-#${r.tokenNum}]` : '';
-        let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}${tokenString}`;
-
-        let tr = `<tr>
-            <td style="font-weight: 500; color: var(--text-muted);">${dateTimeDisplay}</td>
-            <td style="font-weight:600;">${r.customer}</td>
-            <td>${r.item}</td>
-            <td style="${qtyStyle}">${displayQty}</td>
-            <td style="text-align:right; font-weight:600;">${displayWeight} KG</td>
-            <td><span style="${statusStyle}">${r.type}</span></td>
+        let statusStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--accent); font-weight:700;';
+        let qtyVal = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
+        let itemWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
+        let massStr = r.type === 'REFUND' ? `-${itemWeightKg}` : itemWeightKg;
+        let tStr = r.tokenNum ? `TOKEN #${r.tokenNum}` : 'N/A';
+        
+        let row = `<tr>
+            <td>${r.date}</td>
+            <td style="color:var(--text-muted); font-weight:500;">${r.time || 'N/A'}</td>
+            <td style="font-weight:700; color:var(--primary); font-size:12px;">${tStr}</td>
+            <td style="font-weight:700; color:var(--text-main);">${r.customer}</td>
+            <td style="font-weight:600;">${r.item}</td>
+            <td style="text-align:center; font-weight:800; color:var(--text-main);">${qtyVal} Units<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${massStr} KG</span></td>
+            <td style="text-align:center; ${statusStyle}">${r.type}</td>
         </tr>`;
-        tbody.insertAdjacentHTML('beforeend', tr);
+        tbody.insertAdjacentHTML('beforeend', row);
     });
 }
 
-// Clear Filters Logic
-function clearConsumptionFilters() {
-    document.getElementById('filter-cust').value = "ALL";
-    document.getElementById('filter-item').value = "ALL";
-    document.getElementById('filter-date').value = "ALL";
-    renderConsumptionReport();
-}
-
 function exportConsumptionToCSV() {
-    let data = getAllConsumptionData();
-    if(data.length === 0) return alert("Structural target storage layer empty.");
+    let fCust = document.getElementById('filter-cust').value;
+    let fItem = document.getElementById('filter-item').value;
+    let fDate = document.getElementById('filter-date').value;
+    
+    let structuralDataset = [];
+    currentDayLog.forEach(r => {
+        structuralDataset.push({ date: getFormattedSystemDate(), time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: 'SALE', tokenNum: r.tokenNum });
+    });
+    currentRefundLog.forEach(r => {
+        structuralDataset.push({ date: getFormattedSystemDate(), time: r.time, customer: r.customer || "Walk-In", item: r.item, qty: r.qty, type: 'REFUND', tokenNum: r.tokenNum });
+    });
+    allTimeHistory.forEach((day, idx) => {
+        let dayDateLabel = normalizeToSystemDate(day.date);
+        if(day.detailedTimeline) {
+            day.detailedTimeline.forEach(entry => {
+                structuralDataset.push({ date: dayDateLabel, time: entry.time, customer: entry.customer || "Walk-In", item: entry.item, qty: entry.qty, type: entry.type || 'SALE', tokenNum: entry.tokenNum });
+            });
+        }
+    });
+    
+    let data = structuralDataset.filter(r => {
+        if (fCust !== "ALL" && r.customer !== fCust) return false;
+        if (fItem !== "ALL" && r.item !== fItem) return false;
+        if (fDate !== "ALL" && r.date !== fDate) return false;
+        return true;
+    });
+    
+    if (data.length === 0) return alert("Structural target storage layer empty.");
     let csvContent = "data:text/csv;charset=utf-8,Timestamp Block Node,Token Reference,Profile Mapping ID,Menu Label,Quantity Scalar,Retroactive Weight Metric(KG),State Vector\n";
     data.forEach(r => {
         let val = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let wVal = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
         let wStr = r.type === 'REFUND' ? `-${wVal}` : wVal;
-        csvContent += `"${r.date}, ${r.time || 'N/A'}", "${r.tokenNum || 'N/A'}", "${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
+        csvContent += `"${r.date}, ${r.time || 'N/A'}","${r.tokenNum || 'N/A'}","${r.customer}","${r.item}",${val},${wStr},"${r.type}"\n`;
     });
     let encodedUri = encodeURI(csvContent);
     let link = document.createElement("a");
@@ -1126,9 +1262,12 @@ function exportConsumptionToCSV() {
 document.getElementById('modal-pin-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitPinModal(); });
 document.getElementById('cust-modal-name-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitCustomerModal(); });
 document.getElementById('new-manual-customer').addEventListener('keypress', function(e) { if (e.key === 'Enter') addCustomerManually(); });
+document.getElementById('new-item-name').addEventListener('keypress', function(e) { if (e.key === 'Enter') addNewItem(); });
+document.getElementById('new-item-weight').addEventListener('keypress', function(e) { if (e.key === 'Enter') addNewItem(); });
 
-// Bootstrap Initial Startup Sequence Loop Trigger
+// Application Bootstrap Liftoff Initialization
 renderCategoryFilters();
 renderMenu();
-renderLogs();
+renderCart();
 populateCustomerDatalist();
+</script>
