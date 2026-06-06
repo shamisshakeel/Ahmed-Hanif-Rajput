@@ -889,7 +889,7 @@ function executeTokenPrinting(customerName) {
         // Render block layout with zero weight references
         token.innerHTML = `
             <div class="brand-main">AHMED HANIF RAJPUT</div>
-            <div style="font-family: Arial, sans-serif !important; font-size: 16px; font-weight: 900; text-align: center; color: #000000 !important; border: 2px solid #000000; padding: 4px 0; margin: 4px 0;">TOKEN NO: ${globalTokenCounter}</div>
+            <div style="font-family: Arial, sans-serif !important; font-size: 10px; font-weight: 900; text-align: center; color: #000000 !important; border: 2px solid #000000; padding: 4px 0; margin: 4px 0;">TOKEN NO: ${globalTokenCounter}</div>
             <div class="pos-divider"></div>
             <div class="item-container">
                 <div class="pos-item">${item}</div>
