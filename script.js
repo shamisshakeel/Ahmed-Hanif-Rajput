@@ -19,6 +19,7 @@ let currentDayLog = JSON.parse(localStorage.getItem('currentDayLog')) || [];
 let currentRefundLog = JSON.parse(localStorage.getItem('currentRefundLog')) || [];
 let allTimeHistory = JSON.parse(localStorage.getItem('allTimeHistory')) || [];
 let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
+let auditLogs = JSON.parse(localStorage.getItem('auditLogs')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
 
 // Sequential Token Tracking Engine Initialization
@@ -122,9 +123,55 @@ function openPinModal(title, type, successCallback) {
     document.getElementById('modal-pin-input').focus();
 }
 
-// Global placeholder for audit logs to maintain setup consistency
 function logAuditEvent(type, description) {
+    let now = new Date();
+    let timestamp = `${getFormattedSystemDate(now)} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    auditLogs.push({ time: timestamp, type: type, description: description, status: "SUCCESS" });
+    localStorage.setItem('auditLogs', JSON.stringify(auditLogs));
     console.log(`[AUDIT LOG] ${type}: ${description}`);
+    
+    // Refresh Audit Log if it is currently open
+    if (document.getElementById('audit-tab') && document.getElementById('audit-tab').classList.contains('active')) {
+        renderAuditLog();
+    }
+}
+
+function renderAuditLog() {
+    const tbody = document.getElementById('audit-log-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    let filterType = document.getElementById('audit-filter-type').value;
+
+    let filtered = auditLogs;
+    if (filterType !== "ALL") {
+        filtered = auditLogs.filter(log => log.type === filterType);
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No audit records found.</td></tr>`;
+        return;
+    }
+
+    // Render in reverse chronological order
+    for(let i = filtered.length - 1; i >= 0; i--) {
+        let log = filtered[i];
+        let tr = `<tr>
+            <td style="font-size:12px; color:var(--text-muted);">${log.time}</td>
+            <td style="font-weight:700; color:var(--primary);">${log.type}</td>
+            <td>${log.description}</td>
+            <td><span style="color:var(--accent); font-weight:700;">${log.status}</span></td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', tr);
+    }
+}
+
+function clearAuditLog() {
+    if(!confirm("Purge all audit records?")) return;
+    openPinModal("Enter Management Keys to Clear Audit Logs", "admin", function() {
+        auditLogs = [];
+        localStorage.setItem('auditLogs', JSON.stringify(auditLogs));
+        renderAuditLog();
+    });
 }
 
 function closePinModal() {
@@ -134,7 +181,7 @@ function closePinModal() {
 
 function submitPinModal() {
     let enteredPin = document.getElementById('modal-pin-input').value.trim();
-    let targetPin = (requiredPinType === 'refund') ? '1414' : '787898';
+    let targetPin = (requiredPinType === 'refund') ? '1414' : 'smoekys444';
     if (enteredPin === targetPin) {
         document.getElementById('secure-pin-modal').style.display = 'none';
         if (activeCallback) activeCallback();
@@ -166,6 +213,7 @@ function attemptOpenConsumption() {
 function attemptOpenAudit() {
     openPinModal("Enter Management Keys to Unlock Security Audit Logs", "admin", function() {
         switchView('audit-tab');
+        renderAuditLog();
     });
 }
 
@@ -875,9 +923,52 @@ function clearAllHistory() {
     });
 }
 
+// Function to auto-save current active data before wiping the shift
+function saveCurrentShiftToHistory() {
+    if (currentDayLog.length === 0 && currentRefundLog.length === 0) return false;
+
+    let netItems = 0; let grossItemsCount = 0; let summary = {}; let detailedTimeline = [];
+
+    currentDayLog.forEach(log => { 
+        netItems += log.qty; grossItemsCount += log.qty;
+        summary[log.item] = (summary[log.item] || 0) + log.qty; 
+        detailedTimeline.push({time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer, tokenNum: log.tokenNum});
+    });
+    currentRefundLog.forEach(log => {
+        grossItemsCount += log.qty;
+        detailedTimeline.push({time: log.time, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In", tokenNum: log.tokenNum});
+    });
+    
+    detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
+    
+    let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
+    let shiftClosingTimestamp = getFormattedSystemDate();
+    
+    let dayRecord = { 
+        date: shiftClosingTimestamp, 
+        startTime: shiftOpeningTime,
+        endTime: shiftClosingTime,
+        totalItems: netItems, 
+        grossItems: grossItemsCount,
+        refundedItems: currentRefundLog.length, 
+        summary: summary, 
+        detailedTimeline: detailedTimeline
+    };
+    allTimeHistory.push(dayRecord);
+    localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    return true;
+}
+
 function attemptStartNewDay() {
     openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
-        startNewDay();
+        let savedData = saveCurrentShiftToHistory(); // Saves to history if records exist
+        startNewDay(); // Clears layout
+        
+        let auditMsg = "Executed Open New Day.";
+        if (savedData) auditMsg += " Previous active records automatically archived to history vault.";
+        logAuditEvent("SHIFT_CONTROL", auditMsg);
+        
         alert("New operational tracking register open.");
     });
 }
@@ -895,36 +986,8 @@ function endDay() {
     if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state queue registry matrices isolated as null.");
     if (!confirm("Terminate current operational runtime cycle window parameters and shift dataset structures?")) return;
     openPinModal("Administrative security checkpoint logic verified execution keys.", "admin", function() {
-        let netItems = 0; let grossItemsCount = 0; let summary = {}; let detailedTimeline = [];
-
-        currentDayLog.forEach(log => { 
-            netItems += log.qty; grossItemsCount += log.qty;
-            summary[log.item] = (summary[log.item] || 0) + log.qty; 
-            detailedTimeline.push({time: log.time, type: 'SALE', item: log.item, qty: log.qty, customer: log.customer, tokenNum: log.tokenNum});
-        });
-        currentRefundLog.forEach(log => {
-            grossItemsCount += log.qty;
-            detailedTimeline.push({time: log.time, type: 'REFUND', item: log.item, qty: log.qty, customer: log.customer || "Walk-In", tokenNum: log.tokenNum});
-        });
-        
-        detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
-        
-        let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
-        let shiftClosingTimestamp = getFormattedSystemDate();
-        
-        let dayRecord = { 
-            date: shiftClosingTimestamp, 
-            startTime: shiftOpeningTime,
-            endTime: shiftClosingTime,
-            totalItems: netItems, 
-            grossItems: grossItemsCount,
-            refundedItems: currentRefundLog.length, 
-            summary: summary, 
-            detailedTimeline: detailedTimeline
-        };
-        allTimeHistory.push(dayRecord);
-        localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+        saveCurrentShiftToHistory();
+        logAuditEvent("SHIFT_CONTROL", "Executed Shift End & Totalized Operational Runtime Data.");
         
         currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
         localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
