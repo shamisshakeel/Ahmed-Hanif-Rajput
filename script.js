@@ -14,16 +14,34 @@ let defaultStructuredItems = [
 let customItems = JSON.parse(localStorage.getItem('categorizedMenu')) || defaultStructuredItems;
 let currentActiveCategory = "All";
 
-let currentCart = {};
+let currentCart = JSON.parse(localStorage.getItem('currentCart')) || {};
 let currentDayLog = JSON.parse(localStorage.getItem('currentDayLog')) || [];
 let currentRefundLog = JSON.parse(localStorage.getItem('currentRefundLog')) || [];
 let allTimeHistory = JSON.parse(localStorage.getItem('allTimeHistory')) || [];
 let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
+let auditLog = JSON.parse(localStorage.getItem('auditLog')) || [];
 
 let activeCallback = null;
 let requiredPinType = 'refund'; 
 let activeCustomerSearchQuery = "";
+
+// Audit Logging Function
+function logAuditEvent(eventType, description, status = 'SUCCESS') {
+    const now = new Date();
+    const timestamp = now.toLocaleString([], {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit', second:'2-digit'});
+    
+    const auditEntry = {
+        timestamp: timestamp,
+        date: now.toISOString(),
+        eventType: eventType,
+        description: description,
+        status: status
+    };
+    
+    auditLog.push(auditEntry);
+    localStorage.setItem('auditLog', JSON.stringify(auditLog));
+}
 
 // Date String Sanitizer & Normalizer Engine
 function normalizeToSystemDate(rawDateString) {
@@ -107,6 +125,9 @@ function switchView(tabId) {
     if (tabId === 'history-tab' || tabId === 'logs-tab') {
         renderLogs();
     }
+    if (tabId === 'audit-tab') {
+        renderAuditLog();
+    }
 }
 
 // Security Verification Layer Modals Engine
@@ -128,10 +149,12 @@ function submitPinModal() {
     let enteredPin = document.getElementById('modal-pin-input').value.trim();
     let targetPin = (requiredPinType === 'refund') ? '1414' : 'smoekys444';
     if (enteredPin === targetPin) {
+        logAuditEvent('PASSWORD_ATTEMPT', `${requiredPinType.charAt(0).toUpperCase() + requiredPinType.slice(1)} PIN entered successfully`, 'SUCCESS');
         document.getElementById('secure-pin-modal').style.display = 'none';
         if (activeCallback) activeCallback();
         activeCallback = null;
     } else {
+        logAuditEvent('PASSWORD_ATTEMPT', `${requiredPinType.charAt(0).toUpperCase() + requiredPinType.slice(1)} PIN failed - incorrect entry`, 'FAILED');
         alert("Security failure. Operation Denied.");
         document.getElementById('modal-pin-input').value = '';
     }
@@ -152,6 +175,13 @@ function attemptOpenConsumption() {
         populateFilterOptions();
         populateShiftSelectorOptions();
         renderConsumptionReport();
+    });
+}
+
+function attemptOpenAudit() {
+    openPinModal("Enter Management Keys to Unlock Audit Log", "admin", function() {
+        switchView('audit-tab');
+        renderAuditLog();
     });
 }
 
@@ -225,7 +255,7 @@ function executeCustomerMerge() {
         return;
     }
     
-    if(!confirm(`Are you absolutely sure you want to merge "${source}" into "${target}"?\nAll history records, shift logs, and analytics data will be combined into "${target}", and "${source}" will be deleted.`)) {
+    if(!confirm(`Are you absolutely sure you want to merge "${source}" into "${target}"?\nAll history records, shift logs, and analytics data will be combined into "${target}", and "${source}" wi[...]
         return;
     }
     
@@ -251,6 +281,8 @@ function executeCustomerMerge() {
     let srcIdx = knownCustomers.indexOf(source);
     if(srcIdx > -1) knownCustomers.splice(srcIdx, 1);
     localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+    
+    logAuditEvent('CUSTOMER_MODIFIED', `Merged customer profile "${source}" into "${target}"`);
     
     alert(`Customer Record Integration Successful! "${source}" has been combined into "${target}".`);
     
@@ -278,6 +310,8 @@ function exportSystemBackupJSON() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     document.body.removeChild(downloadAnchor);
+    
+    logAuditEvent('SETTINGS_CHANGED', 'System backup exported');
 }
 
 function importSystemBackupJSON() {
@@ -319,10 +353,13 @@ function importSystemBackupJSON() {
             knownCustomers = parsedData.knownCustomers || [];
             shiftStartTime = parsedData.shiftStartTime || null;
             
+            logAuditEvent('DATA_RESTORED', `System data restored from backup file: ${selectedFile.name}`);
+            
             alert("Database Memory Override Successfully Restored!");
             location.reload(); 
             
         } catch(err) {
+            logAuditEvent('DATA_RESTORED', `Backup import failed: ${err.message}`, 'FAILED');
             alert("Error parsing memory file: Invalid or corrupted JSON backup package schema layout.\n" + err.message);
         }
     };
@@ -366,8 +403,12 @@ function updateItemWeightRow(index) {
         alert("Entry out of bounds range parameters.");
         return;
     }
+    let oldWeight = customItems[index].weight;
     customItems[index].weight = newW;
     localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
+    
+    logAuditEvent('SETTINGS_CHANGED', `Menu item "${customItems[index].name}" weight changed from ${oldWeight}g to ${newW}g`);
+    
     alert(`Retroactive execution mapping successful. Item weight altered to ${newW}g.`);
     renderMenu();
     updateLiveBreakdown();
@@ -381,6 +422,9 @@ function addCustomerManually() {
     if (!knownCustomers.includes(name)) {
         knownCustomers.push(name);
         localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+        
+        logAuditEvent('CUSTOMER_MODIFIED', `New customer profile added: "${name}"`);
+        
         populateCustomerDatalist();
         populateMergeDropdowns();
         renderCustomerManagement();
@@ -409,6 +453,9 @@ function editCustomer(index) {
         }
     });
     localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+    
+    logAuditEvent('CUSTOMER_MODIFIED', `Customer profile renamed: "${oldName}" → "${formattedName}"`);
+    
     populateCustomerDatalist();
     populateMergeDropdowns();
     renderCustomerManagement();
@@ -420,6 +467,9 @@ function deleteCustomer(index) {
     if (confirm(`Wipe "${targetName}" identity mapping block trace completely?`)) {
         knownCustomers.splice(index, 1);
         localStorage.setItem('knownCustomers', JSON.stringify(knownCustomers));
+        
+        logAuditEvent('CUSTOMER_MODIFIED', `Customer profile deleted: "${targetName}"`);
+        
         populateCustomerDatalist();
         populateMergeDropdowns();
         renderCustomerManagement();
@@ -504,6 +554,9 @@ function addNewItem() {
     if(!name) return;
     customItems.push({ name: name, category: catSelect.value, weight: weight });
     localStorage.setItem('categorizedMenu', JSON.stringify(customItems));
+    
+    logAuditEvent('SETTINGS_CHANGED', `New menu item added: "${name}" (${catSelect.value}, ${weight}g)`);
+    
     nameInput.value = '';
     weightInput.value = '';
     alert(`Successfully mapped item allocation array schema instance.`);
@@ -533,11 +586,16 @@ function renderCart() {
     }
 }
 
-function addToCart(item) { currentCart[item] = (currentCart[item] || 0) + 1; renderCart(); }
+function addToCart(item) { 
+    currentCart[item] = (currentCart[item] || 0) + 1; 
+    localStorage.setItem('currentCart', JSON.stringify(currentCart));
+    renderCart(); 
+}
 
 function changeQty(item, amount) { 
     currentCart[item] += amount; 
     if (currentCart[item] <= 0) delete currentCart[item]; 
+    localStorage.setItem('currentCart', JSON.stringify(currentCart));
     renderCart();
 }
 
@@ -566,7 +624,7 @@ function updateLiveBreakdown() {
                 <span>Net Verified Shift Inventory:</span><span>${grossCount} Units</span>
             </div>
         </div>
-        <div style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;">Dynamic Mass Metrics Breakdown</div>
+        <div style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;">Dynamic Mass[...]
         <table style="width:100%; font-size:13px; color:var(--text-main); border-collapse:collapse;">
     `;
 
@@ -582,7 +640,7 @@ function updateLiveBreakdown() {
                 let calcWeightKg = ((itemTotals[item] * getItemWeight(item)) / 1000).toFixed(2);
                 html += `<tr>
                     <td style="padding:2px 0 2px 8px; font-weight:500;">${item}</td>
-                    <td style="text-align:right; font-weight:700; color:var(--text-main);">x${itemTotals[item]} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(${calcWeightKg} KG)</span></td>
+                    <td style="text-align:right; font-weight:700; color:var(--text-main);">x${itemTotals[item]} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(${calcW[...]
                 </tr>`;
             }
         }
@@ -594,7 +652,7 @@ function updateLiveBreakdown() {
 function renderLogs() {
     const logBody = document.getElementById('live-log');
     logBody.innerHTML = '';
-    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No item array stream signals captured.</td></tr>`; }
+    if(currentDayLog.length === 0){ logBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No item array stream signals captured.</td></t[...]
     
     for(let i = currentDayLog.length - 1; i >= 0; i--) {
         let log = currentDayLog[i];
@@ -603,7 +661,7 @@ function renderLogs() {
         let row = `<tr>
             <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
             <td><div style="font-weight:600; color:var(--text-main);">${log.item}</div>${customerDisplay}</td>
-            <td style="text-align:center; font-weight:700; color:var(--primary);">x${log.qty}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${itemWeightKg} KG</span></td>
+            <td style="text-align:center; font-weight:700; color:var(--primary);">x${log.qty}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${itemWeightKg} KG</spa[...]
             <td style="text-align:center;"><button class="btn-action-small btn-refund" onclick="refundLogItem(${i})">Void</button></td>
         </tr>`;
         logBody.insertAdjacentHTML('beforeend', row);
@@ -611,7 +669,7 @@ function renderLogs() {
 
     const refundBody = document.getElementById('refund-log');
     refundBody.innerHTML = '';
-    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generated.</td></tr>`; }
+    if(currentRefundLog.length === 0) { refundBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8; padding:20px; font-size:13px;">No historical void signals logs generat[...]
     
     for(let j = currentRefundLog.length - 1; j >= 0; j--) {
         let rLog = currentRefundLog[j];
@@ -628,7 +686,7 @@ function renderLogs() {
 
     const histContainer = document.getElementById('history-container');
     histContainer.innerHTML = '';
-    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger history index empty array structure.</p>'; }
+    if(allTimeHistory.length === 0) { histContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; font-size:14px; padding-top:20px; width:100%;">Vault ledger history index empty array [...]
     
     allTimeHistory.forEach((day, index) => {
         let normalizedDateLabel = normalizeToSystemDate(day.date);
@@ -656,14 +714,14 @@ function renderLogs() {
                         catHeaderAdded = true;
                     }
                     let histItemWeight = ((day.summary[itm] * getItemWeight(itm)) / 1000).toFixed(2);
-                    html += `<tr><td style="padding:2px 0 2px 6px;">${itm}</td><td style="text-align:right; font-weight:600; color:var(--text-main);">x${day.summary[itm]} <span style="font-size:11px; font-weight:normal; color:var(--text-muted);">(${histItemWeight} KG)</span></td></tr>`;
+                    html += `<tr><td style="padding:2px 0 2px 6px;">${itm}</td><td style="text-align:right; font-weight:600; color:var(--text-main);">x${day.summary[itm]} <span style="font-size:1[...]
                 }
             }
         });
         html += `</table>`;
         
         if (day.detailedTimeline && day.detailedTimeline.length > 0) {
-            html += `<div style="font-weight:700; font-size:11px; margin-top:12px; color:var(--text-muted); text-transform:uppercase; border-top: 1px dashed var(--border); padding-top: 8px;">Chronological Action Log Flow</div><div class="timeline-box">`;
+            html += `<div style="font-weight:700; font-size:11px; margin-top:12px; color:var(--text-muted); text-transform:uppercase; border-top: 1px dashed var(--border); padding-top: 8px;">Chro[...]
             day.detailedTimeline.forEach(t => {
                 let styleRule = t.type === 'REFUND' ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-main);';
                 let nameSuffix = t.customer ? ` (${t.customer})` : '';
@@ -688,6 +746,9 @@ function refundLogItem(index) {
         localStorage.setItem('currentRefundLog', JSON.stringify(currentRefundLog));
         currentDayLog.splice(index, 1);
         localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+        
+        logAuditEvent('SETTINGS_CHANGED', `Item refunded: ${targetItem.qty}x ${targetItem.item} (${targetItem.customer || 'Walk-In'})`);
+        
         renderLogs();
         printSingleRefundToken(refundObject);
     });
@@ -802,14 +863,18 @@ function executeTokenPrinting(customerName) {
         printArea.appendChild(token);
     }
     localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
-    setTimeout(() => { window.print(); currentCart = {}; renderCart(); renderLogs(); }, 50);
+    setTimeout(() => { window.print(); currentCart = {}; localStorage.setItem('currentCart', JSON.stringify(currentCart)); renderCart(); renderLogs(); }, 50);
 }
 
 function deleteHistoryItem(index) {
     if (!confirm("Permanently drop selected ledger sequence index container?")) return;
     openPinModal("Management authentication validation parameters active.", "admin", function() {
+        let deletedDate = allTimeHistory[index].date;
         allTimeHistory.splice(index, 1);
         localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+        
+        logAuditEvent('HISTORY_CLEARED', `Historical record deleted for date: ${deletedDate}`);
+        
         renderLogs();
     });
 }
@@ -819,6 +884,9 @@ function clearAllHistory() {
     openPinModal("Administrative security credentials requested.", "admin", function() {
         allTimeHistory = [];
         localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+        
+        logAuditEvent('HISTORY_CLEARED', 'All historical records cleared');
+        
         renderLogs();
     });
 }
@@ -833,7 +901,9 @@ function attemptStartNewDay() {
 function startNewDay() {
     currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
     localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
-    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
+    currentCart = {}; localStorage.setItem('currentCart', JSON.stringify(currentCart)); renderCart(); renderLogs(); switchView('pos-tab');
+    
+    logAuditEvent('SETTINGS_CHANGED', 'New day started - all logs cleared');
 }
 
 function endDay() {
@@ -870,6 +940,8 @@ function endDay() {
         };
         allTimeHistory.push(dayRecord);
         localStorage.setItem('allTimeHistory', JSON.stringify(allTimeHistory));
+        
+        logAuditEvent('SETTINGS_CHANGED', `Shift ended: ${netItems} units sold, ${currentRefundLog.length} refunds`);
         
         currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
         localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
@@ -996,7 +1068,7 @@ function calculateHighConsumptionMatrix(data) {
         }
     }
     if (!anomaliesFound) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:16px; font-size:13px;">No critical boundary tracking triggers flagged. System context baseline stable.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:16px; font-size:13px;">No critical boundary tracking triggers flagged. System context bas[...]
     }
 }
 
@@ -1016,11 +1088,11 @@ function renderConsumptionReport() {
         return true;
     });
     if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No ledger entries matched filter constraint attributes.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No ledger entries matched filter constraint attributes.</td></tr>[...]
         return;
     }
     filtered.forEach(r => {
-        let statusStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; background:#fee2e2; padding:4px 8px; border-radius:4px;' : 'color:var(--accent); font-weight:700; background:#dcfce7; padding:4px 8px; border-radius:4px;';
+        let statusStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; background:#fee2e2; padding:4px 8px; border-radius:4px;' : 'color:var(--accent); font-weight:700; backgroun[...]
         let qtyStyle = r.type === 'REFUND' ? 'color:var(--danger); font-weight:700; text-align:right;' : 'font-weight:700; text-align:right;';
         let displayQty = r.type === 'REFUND' ? `-${r.qty}` : r.qty;
         let calcWeightKg = ((r.qty * getItemWeight(r.item)) / 1000).toFixed(2);
@@ -1069,6 +1141,47 @@ function exportConsumptionToCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Audit Log Functions
+function renderAuditLog() {
+    let filterType = document.getElementById('audit-filter-type').value;
+    let tbody = document.getElementById('audit-log-tbody');
+    tbody.innerHTML = '';
+    
+    let filtered = auditLog;
+    if (filterType !== 'ALL') {
+        filtered = auditLog.filter(log => log.eventType === filterType);
+    }
+    
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No audit events recorded.</td></tr>`;
+        return;
+    }
+    
+    // Show newest first
+    for (let i = filtered.length - 1; i >= 0; i--) {
+        let log = filtered[i];
+        let statusColor = log.status === 'SUCCESS' ? 'color:var(--accent); font-weight:700;' : 'color:var(--danger); font-weight:700;';
+        let row = `<tr>
+            <td style="font-weight: 500; color: var(--text-muted);">${log.timestamp}</td>
+            <td style="font-weight:600; color:var(--primary);">${log.eventType}</td>
+            <td>${log.description}</td>
+            <td style="${statusColor}">${log.status}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+    }
+}
+
+function clearAuditLog() {
+    if (!confirm("Permanently delete all audit log records? This action cannot be undone.")) return;
+    openPinModal("Enter admin PIN to confirm clearing audit logs", "admin", function() {
+        auditLog = [];
+        localStorage.setItem('auditLog', JSON.stringify(auditLog));
+        logAuditEvent('SETTINGS_CHANGED', 'Audit log cleared');
+        renderAuditLog();
+        alert("Audit log cleared successfully!");
+    });
 }
 
 // Operational DOM Global Event Key Bindings UI Hooks
