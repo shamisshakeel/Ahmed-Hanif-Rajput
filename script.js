@@ -22,10 +22,80 @@ let knownCustomers = JSON.parse(localStorage.getItem('knownCustomers')) || [];
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
 let auditLog = JSON.parse(localStorage.getItem('auditLog')) || [];
 
-let activeCallback = null;
-let requiredPinType = 'refund'; 
-let activeCustomerSearchQuery = "";
+// Sequential Token Tracking Engine Initialization
+let globalTokenCounter = parseInt(localStorage.getItem('globalTokenCounter')) || 100;
 
+// ... [Keep your intermediate audit, router, and customer database code exactly as they are] ...
+
+// Token Printing Generator (Updated: Incremental Token Number Stamping Module Active)
+function executeTokenPrinting(customerName) {
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = ''; 
+    let now = new Date();
+    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let dateStr = getFormattedSystemDate(now);
+
+    if (!shiftStartTime) {
+        shiftStartTime = timeStr;
+        localStorage.setItem('shiftStartTime', shiftStartTime);
+    }
+
+    for (let item in currentCart) {
+        let qty = currentCart[item];
+        
+        // Auto-increment token tracking variable sequence
+        globalTokenCounter++;
+        localStorage.setItem('globalTokenCounter', globalTokenCounter);
+        
+        // Push token assignment vector to data log array
+        currentDayLog.push({ 
+            tokenNum: globalTokenCounter,
+            time: timeStr, 
+            item: item, 
+            qty: qty, 
+            customer: customerName 
+        });
+        
+        let token = document.createElement('div');
+        token.className = 'pos-token';
+        
+        // Render block with distinct large token counter visualization element
+        token.innerHTML = `
+            <div class="brand-main">AHMED HANIF RAJPUT</div>
+            <div style="font-family: Arial, sans-serif !important; font-size: 24px; font-weight: 900; text-align: center; color: #000000 !important; border: 2px solid #000000; padding: 4px 0; margin: 4px 0;">TOKEN NO: ${globalTokenCounter}</div>
+            <div class="pos-divider"></div>
+            <div class="item-container">
+                <div class="pos-item">${item}</div>
+                <div class="pos-qty">UNITS COUNT: [ ${qty} ]</div>
+            </div>
+            <div class="pos-divider"></div>
+            <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
+            <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase;">ACCOUNT MAPPING: ${customerName}</div>
+        `;
+        printArea.appendChild(token);
+    }
+    
+    localStorage.setItem('currentDayLog', JSON.stringify(currentDayLog));
+    setTimeout(() => { 
+        window.print(); 
+        currentCart = {}; 
+        localStorage.setItem('currentCart', JSON.stringify(currentCart)); 
+        renderCart(); 
+        renderLogs(); 
+    }, 50);
+}
+
+// Reset Token Counter when starting a clean day block parameters
+function startNewDay() {
+    currentDayLog = []; currentRefundLog = []; shiftStartTime = null;
+    globalTokenCounter = 100; // Resets cleanly to baseline counter state
+    localStorage.setItem('globalTokenCounter', globalTokenCounter);
+    
+    localStorage.removeItem('currentDayLog'); localStorage.removeItem('currentRefundLog'); localStorage.removeItem('shiftStartTime');
+    currentCart = {}; localStorage.setItem('currentCart', JSON.stringify(currentCart)); renderCart(); renderLogs(); switchView('pos-tab');
+    
+    logAuditEvent('SETTINGS_CHANGED', 'New day started - logs and token counter reset');
+}
 // ===== AUDIT LOGGING FUNCTIONS =====
 function logAuditEvent(eventType, description, status = 'SUCCESS') {
     const now = new Date();
