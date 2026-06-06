@@ -53,7 +53,6 @@
     <button class="tab-btn" id="btn-history-tab" onclick="switchView('history-tab')">Saved History</button>
     <button class="tab-btn" id="btn-customers-tab" onclick="attemptOpenCustomers()">Database & Weights Control</button>
     <button class="tab-btn" id="btn-consumption-tab" onclick="attemptOpenConsumption()">Consumption Report Matrix</button>
-    <button class="tab-btn" id="btn-audit-tab" onclick="attemptOpenAudit()">Security Audit Log</button>
 </div>
 
 <div class="tab-content active" id="pos-tab">
@@ -263,43 +262,6 @@
                         </tr>
                     </thead>
                     <tbody id="consumption-report-tbody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="tab-content" id="audit-tab">
-    <div class="archive-dashboard">
-        <div class="main-panel">
-            <div class="panel-header-row">
-                <div class="section-title margin-0">🔐 Security & Configuration Audit Trail Log</div>
-                <button class="btn btn-danger font-size-13" onclick="clearAuditLog()">Clear Audit Records</button>
-            </div>
-            <div class="filter-panel" style="margin-bottom: 20px;">
-                <div class="filter-group">
-                    <label>Filter by Event Type</label>
-                    <select id="audit-filter-type" class="select-field" onchange="renderAuditLog()">
-                        <option value="ALL">All Events</option>
-                        <option value="PASSWORD_ATTEMPT">Password Attempts</option>
-                        <option value="SETTINGS_CHANGED">Settings Changed</option>
-                        <option value="CUSTOMER_MODIFIED">Customer Modified</option>
-                        <option value="DATA_RESTORED">Data Restored</option>
-                        <option value="HISTORY_CLEARED">History Cleared</option>
-                    </select>
-                </div>
-            </div>
-            <div class="excel-table-container">
-                <table class="excel-table">
-                    <thead>
-                        <tr>
-                            <th class="w-200">Date & Time</th>
-                            <th class="w-180">Event Type</th>
-                            <th>Description</th>
-                            <th class="w-150">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="audit-log-tbody"></tbody>
                 </table>
             </div>
         </div>
