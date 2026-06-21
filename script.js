@@ -23,13 +23,94 @@ let auditLogs = JSON.parse(localStorage.getItem('auditLogs')) || [];
 
 let shiftStartTime = localStorage.getItem('shiftStartTime') || null;
 let shiftStartDate = localStorage.getItem('shiftStartDate') || null;
+let activeShiftDate = localStorage.getItem('activeShiftDate') || null; 
 
-// Sequential Token Tracking Engine Initialization
 let globalTokenCounter = parseInt(localStorage.getItem('globalTokenCounter')) || 100;
 
 let activeCallback = null;
 let requiredPinType = 'refund'; 
 let activeCustomerSearchQuery = "";
+
+// ----------------------------------------------------
+// Service Worker Registration for Offline Mode
+// ----------------------------------------------------
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('ServiceWorker registered:', reg.scope);
+        }).catch(err => {
+            console.log('ServiceWorker failure:', err);
+        });
+    });
+}
+
+window.addEventListener('offline', () => document.getElementById('offline-banner').style.display = 'block');
+window.addEventListener('online', () => document.getElementById('offline-banner').style.display = 'none');
+if (!navigator.onLine) document.getElementById('offline-banner').style.display = 'block';
+
+// ----------------------------------------------------
+// Automated Shift Engine (10 AM to 3 AM Rollover)
+// ----------------------------------------------------
+function getCalculatedShiftDate() {
+    let now = new Date();
+    let hours = now.getHours();
+    let shiftStart = new Date(now);
+    
+    // Any transaction before 10 AM gets grouped into yesterday's shift record
+    if (hours < 10) {
+        shiftStart.setDate(shiftStart.getDate() - 1);
+    }
+    return getFormattedSystemDate(shiftStart);
+}
+
+function processAutomatedShiftRollover() {
+    let currentCalculatedShift = getCalculatedShiftDate();
+    
+    if (!activeShiftDate) {
+        activeShiftDate = currentCalculatedShift;
+        localStorage.setItem('activeShiftDate', activeShiftDate);
+        return;
+    }
+
+    if (currentCalculatedShift !== activeShiftDate) {
+        let hasDataToSave = saveCurrentShiftToHistory();
+        
+        // Auto-download JSON backup to hard drive immediately when the shift ends
+        if (hasDataToSave) {
+            exportSystemBackupJSON(`AHRP_Backup_AutoShiftEnd_${activeShiftDate.replace(/ /g, "_")}.json`);
+        }
+        
+        currentDayLog = [];
+        currentRefundLog = [];
+        globalTokenCounter = 100;
+        shiftStartTime = null;
+        shiftStartDate = null;
+        
+        localStorage.removeItem('currentDayLog');
+        localStorage.removeItem('currentRefundLog');
+        localStorage.removeItem('shiftStartTime');
+        localStorage.removeItem('shiftStartDate');
+        localStorage.setItem('globalTokenCounter', 100);
+        
+        activeShiftDate = currentCalculatedShift;
+        localStorage.setItem('activeShiftDate', activeShiftDate);
+        
+        logAuditEvent("SHIFT_CONTROL", `Automated Rollover executed. New shift: ${activeShiftDate}`);
+        renderLogs();
+        renderCart();
+    }
+}
+
+// Checks the clock every 1 minute to trigger the rollover exactly at 10 AM
+setInterval(processAutomatedShiftRollover, 60000);
+
+// Exact Timestamps for every log action
+function getExactTimestamp() {
+    let now = new Date();
+    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+    let dateStr = getFormattedSystemDate(now);
+    return `${dateStr} - ${timeStr}`;
+}
 
 // Date String Sanitizer & Normalizer Engine
 function normalizeToSystemDate(rawDateString) {
@@ -124,8 +205,7 @@ function openPinModal(title, type, successCallback) {
 }
 
 function logAuditEvent(type, description) {
-    let now = new Date();
-    let timestamp = `${getFormattedSystemDate(now)} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    let timestamp = getExactTimestamp();
     auditLogs.push({ time: timestamp, type: type, description: description, status: "SUCCESS" });
     localStorage.setItem('auditLogs', JSON.stringify(auditLogs));
     
@@ -317,7 +397,7 @@ function executeCustomerMerge() {
     renderLogs();
 }
 
-function exportSystemBackupJSON() {
+function exportSystemBackupJSON(customFilename) {
     let backupPayload = {
         categorizedMenu: JSON.parse(localStorage.getItem('categorizedMenu')) || customItems,
         currentDayLog: JSON.parse(localStorage.getItem('currentDayLog')) || currentDayLog,
@@ -326,13 +406,15 @@ function exportSystemBackupJSON() {
         knownCustomers: JSON.parse(localStorage.getItem('knownCustomers')) || knownCustomers,
         shiftStartTime: localStorage.getItem('shiftStartTime') || shiftStartTime,
         shiftStartDate: localStorage.getItem('shiftStartDate') || shiftStartDate,
+        activeShiftDate: localStorage.getItem('activeShiftDate') || activeShiftDate,
         globalTokenCounter: globalTokenCounter
     };
     
+    let filename = customFilename || `AHRP_POS_SYSTEM_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
     let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
     let downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `AHRP_POS_SYSTEM_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
+    downloadAnchor.setAttribute("download", filename);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     document.body.removeChild(downloadAnchor);
@@ -365,6 +447,8 @@ function importSystemBackupJSON() {
             localStorage.setItem('allTimeHistory', JSON.stringify(parsedData.allTimeHistory || []));
             localStorage.setItem('knownCustomers', JSON.stringify(parsedData.knownCustomers || []));
             
+            if(parsedData.activeShiftDate) localStorage.setItem('activeShiftDate', parsedData.activeShiftDate);
+            
             if(parsedData.shiftStartTime) {
                 localStorage.setItem('shiftStartTime', parsedData.shiftStartTime);
             } else {
@@ -389,6 +473,7 @@ function importSystemBackupJSON() {
             knownCustomers = parsedData.knownCustomers || [];
             shiftStartTime = parsedData.shiftStartTime || null;
             shiftStartDate = parsedData.shiftStartDate || null;
+            activeShiftDate = parsedData.activeShiftDate || null;
             
             alert("Database Memory Override Successfully Restored!");
             location.reload(); 
@@ -673,7 +758,7 @@ function renderLogs() {
         let tokenDisplay = `<div style="font-size:11px; font-weight:800; color:var(--danger); margin-bottom:2px;">TOKEN #${log.tokenNum || 'N/A'}</div>`;
 
         let row = `<tr>
-            <td style="color:var(--text-muted); font-weight:500;">${log.time}</td>
+            <td style="color:var(--text-muted); font-weight:500; font-size:11px;">${log.time}</td>
             <td>
                 ${tokenDisplay}
                 <div style="font-weight:600; color:var(--text-main);">${log.item}</div>
@@ -693,7 +778,7 @@ function renderLogs() {
         let rLog = currentRefundLog[j];
         let itemWeightKg = ((rLog.qty * getItemWeight(rLog.item)) / 1000).toFixed(2);
         let row = `<tr>
-            <td style="color:var(--danger); font-weight:500;">${rLog.time}</td>
+            <td style="color:var(--danger); font-weight:500; font-size:11px;">${rLog.time}</td>
             <td style="font-weight:600; color:var(--text-main);">${rLog.customer || 'Walk-In'}</td>
             <td style="font-weight:600; color:var(--text-muted); text-decoration: line-through;">
                 <div style="font-size:11px; font-weight:800; color:var(--text-muted); margin-bottom:2px;">TOKEN #${rLog.tokenNum || 'N/A'}</div>
@@ -766,12 +851,11 @@ function renderLogs() {
 function refundLogItem(index) {
     if (!confirm("Execute target data structure mutation termination override script?")) return;
     openPinModal("Verification authorization protocols requested.", "refund", function() {
-        let now = new Date();
-        let refundTime = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        let exactTime = getExactTimestamp();
         let targetItem = currentDayLog[index];
         let refundObject = { 
             tokenNum: targetItem.tokenNum,
-            time: refundTime, 
+            time: exactTime, 
             item: targetItem.item, 
             qty: targetItem.qty, 
             customer: targetItem.customer || "Walk-In" 
@@ -802,7 +886,7 @@ function printSingleRefundToken(refundObj) {
             <div style="font-weight:900; font-size:14px; margin-top:4px;">-${weightStr} KG</div>
         </div>
         <div class="pos-divider"></div>
-        <div class="meta-line">DATE: ${getFormattedSystemDate()} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${refundObj.time}</div>
+        <div class="meta-line">EXACT TIMESTAMP: ${refundObj.time}</div>
         <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase; text-align:center;">WORKER NAME: ${refundObj.customer}</div>
     `;
     printArea.appendChild(token);
@@ -868,7 +952,6 @@ function printHistoricalShiftLogs(index) {
 
     let timeRangeTitle = (day.startTime && day.endTime) ? `${day.startTime} TO ${day.endTime}` : 'SHIFT LOGS';
     
-    // Group logs by worker name
     let customerGroups = {};
     if (day.detailedTimeline && day.detailedTimeline.length > 0) {
         day.detailedTimeline.forEach(t => {
@@ -880,20 +963,17 @@ function printHistoricalShiftLogs(index) {
         });
     }
 
-    // Sort worker names A-Z
     let sortedCustomers = Object.keys(customerGroups).sort((a, b) => a.localeCompare(b));
     let logsHtml = '';
 
     if (sortedCustomers.length > 0) {
         sortedCustomers.forEach(cust => {
-            // Worker Header
             logsHtml += `
                 <div style="font-size:13px; font-weight:900; color:#000000 !important; text-align:center; margin-top:8px; border-bottom: 2px solid #000000; padding-bottom: 2px;">
                     WORKER: ${cust}
                 </div>
             `;
             
-            // Sort inner logs by Token Number lowest to highest
             let custLogs = customerGroups[cust].sort((a, b) => (parseInt(a.tokenNum) || 0) - (parseInt(b.tokenNum) || 0));
             
             custLogs.forEach(t => {
@@ -996,7 +1076,7 @@ function printActiveShiftLogs() {
     });
 
     let timeRangeTitle = shiftStartTime ? `${shiftStartTime} TO LIVE` : 'ACTIVE SHIFT';
-    let finalDate = shiftStartDate || getFormattedSystemDate();
+    let finalDate = shiftStartDate || activeShiftDate || getCalculatedShiftDate();
 
     let reportDiv = document.createElement('div');
     reportDiv.className = 'pos-report';
@@ -1027,6 +1107,7 @@ function printActiveShiftLogs() {
 
 function printTokens() {
     if (Object.keys(currentCart).length === 0) return;
+    processAutomatedShiftRollover(); // Double check logic right before a print
     openCustomerModal();
 }
 
@@ -1034,13 +1115,11 @@ function printTokens() {
 function executeTokenPrinting(customerName) {
     const printArea = document.getElementById('print-area');
     printArea.innerHTML = ''; 
-    let now = new Date();
-    let timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    let dateStr = getFormattedSystemDate(now);
+    let exactTime = getExactTimestamp();
 
     if (!shiftStartTime) {
-        shiftStartTime = timeStr;
-        shiftStartDate = dateStr;
+        shiftStartTime = exactTime;
+        shiftStartDate = activeShiftDate || getCalculatedShiftDate();
         localStorage.setItem('shiftStartTime', shiftStartTime);
         localStorage.setItem('shiftStartDate', shiftStartDate);
     }
@@ -1053,7 +1132,7 @@ function executeTokenPrinting(customerName) {
 
         currentDayLog.push({ 
             tokenNum: globalTokenCounter,
-            time: timeStr, 
+            time: exactTime, 
             item: item, 
             qty: qty, 
             customer: customerName 
@@ -1062,7 +1141,6 @@ function executeTokenPrinting(customerName) {
         let token = document.createElement('div');
         token.className = 'pos-token';
         
-        // Token number is explicitly styled smaller to save ink and space.
         token.innerHTML = `
             <div class="brand-main">AHMED HANIF RAJPUT</div>
             <div style="font-family: Arial, sans-serif !important; font-size: 12px; font-weight: 900; text-align: center; color: #000000 !important; border: 1px solid #000000; padding: 2px 0; margin: 2px 0;">TOKEN NO: ${globalTokenCounter}</div>
@@ -1072,7 +1150,7 @@ function executeTokenPrinting(customerName) {
                 <div class="pos-qty">QUANTITY: [ ${qty} ]</div>
             </div>
             <div class="pos-divider"></div>
-            <div class="meta-line">DATE: ${dateStr} &nbsp;&nbsp;&nbsp;&nbsp; TIME: ${timeStr}</div>
+            <div class="meta-line">TIMESTAMP: ${exactTime}</div>
             <div style="font-size:12px; font-weight:900; margin-top:4px; text-transform:uppercase; text-align:center;">WORKER NAME: ${customerName}</div>
         `;
         printArea.appendChild(token);
@@ -1116,10 +1194,9 @@ function saveCurrentShiftToHistory() {
     
     detailedTimeline.sort((a, b) => b.time.localeCompare(a.time));
     
-    let shiftClosingTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    let shiftClosingTime = getExactTimestamp();
     let shiftOpeningTime = shiftStartTime || (currentDayLog.length > 0 ? currentDayLog[0].time : shiftClosingTime);
-    let shiftClosingTimestamp = getFormattedSystemDate();
-    let finalShiftDate = shiftStartDate || shiftClosingTimestamp;
+    let finalShiftDate = activeShiftDate || shiftStartDate || getCalculatedShiftDate();
     
     let dayRecord = { 
         date: finalShiftDate, 
@@ -1136,52 +1213,9 @@ function saveCurrentShiftToHistory() {
     return true;
 }
 
-function attemptStartNewDay() {
-    openPinModal("Enter Mandatory Master Access Code to Open New Day Block", "admin", function() {
-        let savedData = saveCurrentShiftToHistory(); 
-        startNewDay(); 
-        
-        let auditMsg = "Executed Open New Day.";
-        if (savedData) auditMsg += " Previous active records automatically archived to history vault.";
-        logAuditEvent("SHIFT_CONTROL", auditMsg);
-        
-        alert("New operational tracking register open.");
-    });
-}
-
-function startNewDay() {
-    currentDayLog = []; currentRefundLog = []; shiftStartTime = null; shiftStartDate = null;
-    globalTokenCounter = 100; 
-    localStorage.setItem('globalTokenCounter', globalTokenCounter);
-
-    localStorage.removeItem('currentDayLog'); 
-    localStorage.removeItem('currentRefundLog'); 
-    localStorage.removeItem('shiftStartTime');
-    localStorage.removeItem('shiftStartDate');
-    currentCart = {}; renderCart(); renderLogs(); switchView('pos-tab');
-}
-
-function endDay() {
-    if (currentDayLog.length === 0 && currentRefundLog.length === 0) return alert("System state queue registry matrices isolated as null.");
-    if (!confirm("Terminate current operational runtime cycle window parameters and shift dataset structures?")) return;
-    openPinModal("Administrative security checkpoint logic verified execution keys.", "admin", function() {
-        saveCurrentShiftToHistory();
-        logAuditEvent("SHIFT_CONTROL", "Executed Shift End & Totalized Operational Runtime Data.");
-        
-        currentDayLog = []; currentRefundLog = []; shiftStartTime = null; shiftStartDate = null;
-        localStorage.removeItem('currentDayLog'); 
-        localStorage.removeItem('currentRefundLog'); 
-        localStorage.removeItem('shiftStartTime');
-        localStorage.removeItem('shiftStartDate');
-        
-        renderLogs();
-        switchView('history-tab');
-    });
-}
-
 function getAllConsumptionData() {
     let rows = [];
-    let liveLabel = shiftStartDate || getFormattedSystemDate();
+    let liveLabel = activeShiftDate || shiftStartDate || getCalculatedShiftDate();
     currentDayLog.forEach(l => {
         rows.push({ date: liveLabel, shiftId: "LIVE", time: l.time, customer: l.customer || "Walk-In", item: l.item, qty: l.qty, type: "SALE", tokenNum: l.tokenNum });
     });
@@ -1191,7 +1225,7 @@ function getAllConsumptionData() {
     allTimeHistory.forEach((day, idx) => {
         if (day.detailedTimeline) {
             day.detailedTimeline.forEach(t => {
-                let rangeStr = (day.startTime && day.endTime) ? ` [${day.startTime}-${day.endTime}]` : '';
+                let rangeStr = (day.startTime && day.endTime) ? ` [Closed]` : '';
                 rows.push({ date: normalizeToSystemDate(day.date) + rangeStr, shiftId: `SHIFT-${idx}`, time: t.time, customer: t.customer || "Walk-In", item: t.item, qty: t.qty, type: t.type, tokenNum: t.tokenNum });
             });
         }
@@ -1329,7 +1363,7 @@ function renderConsumptionReport() {
         let dateTimeDisplay = `${r.date}, ${r.time || 'N/A'}${tokenString}`;
 
         let tr = `<tr>
-            <td style="font-weight: 500; color: var(--text-muted);">${dateTimeDisplay}</td>
+            <td style="font-weight: 500; color: var(--text-muted); font-size:11px;">${dateTimeDisplay}</td>
             <td style="font-weight:600;">${r.customer}</td>
             <td>${r.item}</td>
             <td style="${qtyStyle}">${displayQty}</td>
@@ -1370,6 +1404,8 @@ document.getElementById('modal-pin-input').addEventListener('keypress', function
 document.getElementById('cust-modal-name-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') submitCustomerModal(); });
 document.getElementById('new-manual-customer').addEventListener('keypress', function(e) { if (e.key === 'Enter') addCustomerManually(); });
 
+// Initialization sequence
+processAutomatedShiftRollover();
 renderCategoryFilters();
 renderMenu();
 renderLogs();
